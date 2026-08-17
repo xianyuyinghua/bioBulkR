@@ -234,8 +234,8 @@ enrich_go_kegg <- function(genes,
             scale_fill_manual(values = flow_colors) +
             ggnewscale::new_scale_color() +  # 为 bubble 开启新的颜色标尺
             geom_point(data = bubble_df,aes(x = bubble_x,y = y,size = Count,color = p.adjust),alpha = 0.95) + # 左侧 bubble
-            scale_color_gradientn(colours = fill_colors,guide = guide_colorbar(reverse = TRUE,barheight = grid::unit(5, "lines"),barwidth = grid::unit(1.2, "lines"))) +
-            scale_size_continuous(range = c(4, 8),name = "Size") +
+            scale_color_gradientn(colours = fill_colors,guide = guide_colorbar(reverse = TRUE,order = 1,theme = theme(legend.key.height = grid::unit(5, "lines"),legend.key.width = grid::unit(1.2, "lines")))) +
+            scale_size_continuous(range = c(4, 8),name = "Size",guide = guide_legend(order = 2,override.aes = list(color = "grey40",alpha = 0.95),theme = theme(legend.key.height = grid::unit(1, "lines"),legend.key.width = grid::unit(1, "lines")))) +
             annotate("segment",x = bubble_box_xmin,xend = bubble_box_xmax,y = axis_y,yend = axis_y,linewidth = 0.8,color = "black") + # 气泡图 x 轴 
             geom_segment(data = axis_df,aes(x = x_plot,xend = x_plot,y = axis_y,yend = axis_y - 0.5),inherit.aes = FALSE,linewidth = 0.8,color = "black") + # x轴刻度线
             geom_text(data = axis_df,aes(x = x_plot,y = axis_y - 0.7,label = label_number(accuracy = 0.01)(x_raw)),inherit.aes = FALSE,size = 6,vjust = 1) + # x轴刻度文字
