@@ -1,0 +1,47 @@
+Package: bioBulkR
+Title: Utilities for Bulk RNA-Seq Analysis and Visualization
+Version: 1.0.0
+Authors@R: person("zuoanjian", role = c("aut", "cre"),
+    email = "dnf.zuoanjian@gmail.com")
+Description: Reusable functions for routine bulk RNA-seq analysis and
+    visualization. The package currently provides an integrated Gene Ontology
+    and Kyoto Encyclopedia of Genes and Genomes enrichment workflow with
+    multiple publication-oriented plots, and is intended to grow with
+    differential expression and downstream network analysis utilities.
+License: MIT + file LICENSE
+URL: https://github.com/xianyuyinghua/bioBulkR
+BugReports: https://github.com/xianyuyinghua/bioBulkR/issues
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+Depends:
+    R (>= 4.1.0)
+Imports:
+    basicR,
+    circlize,
+    clusterProfiler,
+    ComplexHeatmap,
+    dplyr,
+    ggnewscale,
+    ggplot2,
+    ggprism,
+    gground,
+    ggsankey,
+    graphics,
+    grDevices,
+    grid,
+    org.Hs.eg.db,
+    org.Mm.eg.db,
+    purrr,
+    R.utils,
+    scales,
+    stringr,
+    tibble,
+    tidyr
+Suggests:
+    testthat (>= 3.0.0)
+Remotes:
+    github::xianyuyinghua/basicR,
+    dxsbiocc/gground,
+    davidsjoberg/ggsankey
+Config/testthat/edition: 3
+Config/roxygen2/version: 8.1.0
