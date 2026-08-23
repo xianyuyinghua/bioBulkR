@@ -18,9 +18,11 @@ Depends:
 Imports:
     affy,
     basicR,
+    biomaRt,
     circlize,
     clusterProfiler,
     ComplexHeatmap,
+    data.table,
     dplyr,
     ggnewscale,
     ggplot2,
