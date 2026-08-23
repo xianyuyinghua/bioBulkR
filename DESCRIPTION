@@ -36,6 +36,8 @@ Imports:
     org.Hs.eg.db,
     org.Mm.eg.db,
     purrr,
+    readr,
+    readxl,
     R.utils,
     scales,
     stringr,
