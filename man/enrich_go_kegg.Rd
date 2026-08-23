@@ -54,9 +54,10 @@ clusterProfiler. \code{"local"} uses the legacy internal data supplied by
 \code{KEGG.db} and requires that package to be installed.}
 
 \item{plot_type}{\code{NULL} to skip plotting, or a character vector containing
-one or more of \code{"barplot"}, \code{"dotplot"}, \code{"sankeyplot"}, and
-\code{"circularplot"}. Multiple plot families can be requested in one call,
-for example \code{c("barplot", "dotplot")}. Each family contains separate
+one or more of \code{"barplot"}, \code{"dotplot"}, \code{"sankeyplot"},
+\code{"treeplot"}, and \code{"circularplot"}. Multiple plot families can be
+requested in one call, for example
+\code{c("barplot", "dotplot", "treeplot")}. Each family contains separate
 GO, KEGG, and combined GO/KEGG outputs. Circular plot entries are drawing
 functions and must be invoked, whereas the other entries are ggplot
 objects.}
@@ -92,8 +93,9 @@ background ratios, enrichment statistics, p-values, mapped gene symbols,
 and gene counts.}
 \item{plot}{\code{NULL} when \code{plot_type = NULL}; otherwise, a nested list keyed
 by plot family. Each requested family contains \code{go}, \code{kegg}, and \code{gokegg}.
-Bar, dot, and Sankey entries are ggplot objects. Circular entries are
-zero-argument functions that draw the plot when called.}
+Bar, dot, Sankey, and tree entries are ggplot objects. Circular entries are
+zero-argument functions that draw the plot when called. Tree entries use the
+names \code{go}, \code{kegg}, and \code{gokegg}.}
 }
 }
 \description{
@@ -111,6 +113,16 @@ supported. Online KEGG analysis requires network access at run time.
 Sankey plots require \code{ggsankey}, \code{ggnewscale}, and \code{gground}. Circular plots
 require \code{circlize} and \code{ComplexHeatmap}. The \code{basicR} package supplies the
 default color palette.
+
+Tree plots display a circular hierarchical graph with four levels: a root
+node, ontology classes, enriched terms, and their mapped genes. GO trees can
+contain BP, CC, and MF branches; KEGG trees contain the KEGG branch; and the
+combined tree contains all available branches below a \code{GO & KEGG} root.
+The terms included in a tree are the same top terms selected by
+\code{go_kegg_topn}. Branch colors are drawn from \code{fill_colors}. If a
+selected result contains no enriched terms, its tree entry is a blank ggplot
+with a \code{No enriched terms} message. Tree plots use \code{tidygraph} and
+\code{ggraph}.
 }
 \examples{
 \dontrun{
@@ -133,6 +145,17 @@ res <- enrich_go_kegg(
   go_kegg_topn = c(10, 10)
 )
 res$plot$barplot$gokegg
+
+# Analysis with circular hierarchy trees
+tree_res <- enrich_go_kegg(
+  genes = genes,
+  species = "9606",
+  plot_type = "treeplot",
+  go_kegg_topn = c(5, 5)
+)
+tree_res$plot$treeplot$go
+tree_res$plot$treeplot$kegg
+tree_res$plot$treeplot$gokegg
 }
 
 }

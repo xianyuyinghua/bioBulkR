@@ -256,6 +256,79 @@ enrich_go_kegg <- function(genes,
         return(p_final)
     }
 
+    # treeplot
+    treeplot <- function(data,
+                         root_name = "Enrichment",
+                         colors = fill_colors
+                        ){
+        data <- data %>% as.data.frame(check.names = FALSE)
+        if(nrow(data) == 0){
+            return(
+                ggplot() +
+                annotate("text", x = 0, y = 0, label = "No enriched terms") +
+                theme_void()
+            )
+        }
+
+        tree_data <- data %>%
+            dplyr::transmute(ONTOLOGY = as.character(ONTOLOGY),
+                             Description = as.character(Description),
+                             geneID = as.character(geneID)) %>%
+            dplyr::distinct() %>%
+            dplyr::group_by(ONTOLOGY, Description) %>%
+            dplyr::mutate(term_number = dplyr::cur_group_id()) %>%
+            dplyr::ungroup() %>%
+            tidyr::separate_rows(geneID, sep = "/") %>%
+            dplyr::filter(!is.na(geneID), geneID != "") %>%
+            dplyr::mutate(ontology_id = paste0("ontology::", ONTOLOGY),
+                          term_id = paste0("term::", term_number),
+                          gene_node_id = paste0("gene::", term_number, "::", geneID))
+
+        ontology_nodes <- tree_data %>%
+            dplyr::distinct(id = ontology_id, label = ONTOLOGY) %>%
+            dplyr::mutate(branch = label, node_type = "ontology")
+        term_nodes <- tree_data %>%
+            dplyr::distinct(id = term_id, label = Description, branch = ONTOLOGY) %>%
+            dplyr::mutate(node_type = "term")
+        gene_nodes <- tree_data %>%
+            dplyr::distinct(id = gene_node_id, label = geneID, branch = ONTOLOGY) %>%
+            dplyr::mutate(node_type = "gene")
+        root_node <- data.frame(id = "root", label = root_name,
+                                branch = "Root", node_type = "root")
+        nodes <- dplyr::bind_rows(root_node, ontology_nodes, term_nodes, gene_nodes)
+
+        ontology_edges <- ontology_nodes %>%
+            dplyr::transmute(from = "root", to = id)
+        term_edges <- tree_data %>%
+            dplyr::distinct(from = ontology_id, to = term_id)
+        gene_edges <- tree_data %>%
+            dplyr::distinct(from = term_id, to = gene_node_id)
+        edges <- dplyr::bind_rows(ontology_edges, term_edges, gene_edges)
+
+        branch_names <- unique(nodes$branch)
+        branch_colors <- stats::setNames(rep(colors, length.out = length(branch_names)), branch_names)
+        node_sizes <- c(root = 12, ontology = 8, term = 4, gene = 2)
+        graph <- tidygraph::tbl_graph(nodes = nodes, edges = edges, node_key = "id")
+
+        ggraph::ggraph(graph, layout = "dendrogram", circular = TRUE) +
+            ggraph::geom_edge_diagonal(aes(color = node1.branch), alpha = 1/3) +
+            ggraph::geom_node_point(aes(size = node_type, color = branch), alpha = 0.6) +
+            ggraph::geom_node_text(aes(label = label,
+                                       filter = leaf,
+                                       angle = -((-atan2(y, x) * 180 / pi + 90) %% 180) + 90,
+                                       color = branch),
+                                   size = 3) +
+            ggraph::geom_node_text(aes(label = label,
+                                       filter = !leaf,
+                                       color = branch),
+                                   fontface = "bold", size = 5) +
+            scale_color_manual(values = branch_colors) +
+            scale_size_manual(values = node_sizes) +
+            coord_fixed() +
+            theme_void() +
+            theme(legend.position = "none")
+    }
+
     # circosEnrichmentPlot
     circosEnrichmentPlot <- function(df,
                                      topN = 6,
@@ -651,14 +724,16 @@ enrich_go_kegg <- function(genes,
             plot_list$sankeyplot$kegg = p_kegg
             plot_list$sankeyplot$gokegg = p_gokegg           
         }
-        # if("treeplot" %in% plot_type){
-        #     # 树图
-            
-            
-        #     plot_list$treeplot$go = p_go
-        #     plot_list$treeplot$kegg = p_kegg
-        #     plot_list$treeplot$gokegg = p_gokegg           
-        # }
+        if("treeplot" %in% plot_type){
+            # 树图
+            p_go <- treeplot(data = pdata_plot, root_name = "GO", colors = fill_colors)
+            p_kegg <- treeplot(data = kdata_plot, root_name = "KEGG", colors = fill_colors)
+            p_gokegg <- treeplot(data = pkdata_plot, root_name = "GO & KEGG", colors = fill_colors)
+
+            plot_list$treeplot$go = p_go
+            plot_list$treeplot$kegg = p_kegg
+            plot_list$treeplot$gokegg = p_gokegg
+        }
         if("circularplot" %in% plot_type){
             # 环形图
             pdata_plot_process <- process_enrichment_data_base(pdata_plot,pname = p_name)
