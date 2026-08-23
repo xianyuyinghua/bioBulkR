@@ -239,7 +239,7 @@ enrich_go_kegg <- function(genes,
             annotate("segment",x = bubble_box_xmin,xend = bubble_box_xmax,y = axis_y,yend = axis_y,linewidth = 0.8,color = "black") + # 气泡图 x 轴 
             geom_segment(data = axis_df,aes(x = x_plot,xend = x_plot,y = axis_y,yend = axis_y - 0.5),inherit.aes = FALSE,linewidth = 0.8,color = "black") + # x轴刻度线
             geom_text(data = axis_df,aes(x = x_plot,y = axis_y - 0.7,label = label_number(accuracy = 0.01)(x_raw)),inherit.aes = FALSE,size = 6,vjust = 1) + # x轴刻度文字
-            annotate("text",x = (bubble_box_xmin + bubble_box_xmax) / 2,y = axis_y - (2.5+(nrow(data)*0.5)), label = "Ratio",size = 8) + # x轴标题
+            annotate("text",x = (bubble_box_xmin + bubble_box_xmax) / 2,y = axis_y - (2.5+(nrow(data)*1)), label = "Ratio",size = 8) + # x轴标题
             geom_text(data = left_nodes,aes(x = x_text,y = y,label = label_wrap),hjust = hjust_left,nudge_x = nudge_x_left,vjust = 0.5,size = size_left,lineheight = 0.6,fontface = fontface_left) + # 中间 pathway 标签
             geom_text(data = right_nodes,aes(x = x_text,y = y,label = label_wrap),hjust = hjust_right,nudge_x = nudge_x_right,vjust = 0.5,size = size_right,lineheight = 0.6,fontface = fontface_right) + # 右侧 gene 标签
             coord_cartesian(xlim = xlim,ylim = c(min(node_df$ymin) - 14, max(node_df$ymax)),clip = "off") + # 坐标范围
