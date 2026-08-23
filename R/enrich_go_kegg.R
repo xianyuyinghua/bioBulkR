@@ -270,10 +270,11 @@ enrich_go_kegg <- function(genes,
             )
         }
 
-        tree_data <- data %>% dplyr::transmute(ONTOLOGY = stringr::str_trim(as.character(ONTOLOGY)),
-                                               Description = stringr::str_trim(as.character(Description)),
+        tree_data <- data %>% dplyr::transmute(ONTOLOGY = as.character(ONTOLOGY),
+                                               Description = as.character(Description),
                                                geneID = as.character(geneID)) %>%
             dplyr::distinct() %>%
+            dplyr::filter(!(ONTOLOGY == "KEGG" & Description == "KEGG")) %>% 
             dplyr::group_by(ONTOLOGY, Description) %>%
             dplyr::mutate(term_number = dplyr::cur_group_id()) %>%
             dplyr::ungroup() %>%
