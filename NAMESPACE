@@ -3,6 +3,7 @@
 export(download_array_raw_gset)
 export(download_gset)
 export(enrich_go_kegg)
+export(metadata_process)
 import(ComplexHeatmap)
 import(circlize)
 import(dplyr)
