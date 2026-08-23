@@ -26,6 +26,7 @@ Imports:
     ggprism,
     gground,
     ggsankey,
+    GEOquery,
     graphics,
     grDevices,
     grid,
