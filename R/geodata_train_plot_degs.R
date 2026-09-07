@@ -94,6 +94,7 @@ geodata_train_plot_degs <- function(
     logFC = 0.5,
     p_value = "p.adj",
     p = 0.05,
+    species = 9606,
     enrich_figure_type = "barplot",
     enrich_pname = "p.value",
     go_kegg_topn = c(10,10),
@@ -104,7 +105,9 @@ geodata_train_plot_degs <- function(
     target_file = NULL,
     target_gene_column = NULL,
     target_name = NULL,
-    target_set = NULL
+    target_set = NULL,
+    Enrich = FALSE,
+    PPI = FALSE
 ) {
     setwd(workdir)
 
@@ -212,7 +215,6 @@ geodata_train_plot_degs <- function(
     # 处理样本信息
     sample_group <- read.csv(file.path(data_dir_name,save_dirs[1],"02_Condition.csv"),row.names = 1)
     if( "group" %in% colnames(sample_group) ){
-        sample_group$group <- stringr::str_to_title(sample_group$group)
         sample_group <- sample_group %>% dplyr::rename("Group" = "group")
         if("sample" %in% colnames(sample_group)){
             sample_group <- sample_group %>% tibble::column_to_rownames("sample")
@@ -258,6 +260,9 @@ geodata_train_plot_degs <- function(
         }else{
             data$species = 9606
         }
+    }
+    if(!is.null(species)){
+        data$species <- species
     }
     
     if(length(raw_data) != 0){
@@ -430,375 +435,381 @@ geodata_train_plot_degs <- function(
     
     
     ############################################# Venn Plot #############################################################
-    
-    cat("\n\n\n",yellow,"Start Venn Plot!",reset,"\n")
-    target_files <- list.files(path = file.path(data_dir_name,save_dirs[3]),pattern = ".csv$",recursive = T,full.names = T)
-    target_files <- target_files[!grepl("intersect_genes.csv|Target_venn_result.csv",target_files)]
-    
-    # 获取 Venn 文件夹下有没有目标基因csv文件
-    if(length(target_files) == 0){
-        # 没有获取到任何csv文件的情况，提示手动放入文件值文件夹
-        cat("\n",yellow,"No target gene CSV file was detected. Please verify and place the CSV file in the '03_Venn' folder.",reset,"\n")
-        flush.console()  # 强制刷新控制台输出
-        target_gene_file <- if (is.null(target_gene_file)) readline(prompt = "Is there already a target gene CSV file in the '03_Venn' folder? (yes/no): ") else target_gene_file
-        if(target_gene_file == "yes"){
-            target_files <- list.files(path = file.path(data_dir_name,save_dirs[3]),pattern = ".csv$",recursive = T,full.names = T)
+    if(!is.null(target_file)){
+        # 有 target_file 文件
+        cat("\n\n\n",yellow,"Start Venn Plot!",reset,"\n")
+        target_files <- list.files(path = file.path(data_dir_name,save_dirs[3]),pattern = ".csv$",recursive = T,full.names = T)
+        target_files <- target_files[!grepl("intersect_genes.csv|Target_venn_result.csv",target_files)]
+        
+        # 获取 Venn 文件夹下有没有目标基因csv文件
+        if(length(target_files) == 0){
+            # 没有获取到任何csv文件的情况，提示手动放入文件值文件夹
+            cat("\n",yellow,"No target gene CSV file was detected. Please verify and place the CSV file in the '03_Venn' folder.",reset,"\n")
+            flush.console()  # 强制刷新控制台输出
+            target_gene_file <- if (is.null(target_gene_file)) readline(prompt = "Is there already a target gene CSV file in the '03_Venn' folder? (yes/no): ") else target_gene_file
+            if(target_gene_file == "yes"){
+                target_files <- list.files(path = file.path(data_dir_name,save_dirs[3]),pattern = ".csv$",recursive = T,full.names = T)
+            }
+        }else if(length(target_files) > 1){
+            # 当获取到多个csv文件，提示手动选择
+            cat("\n",yellow,"Multiple CSV files matched. Please select the target file.",reset,"\n")
+            print(target_files)
+            flush.console()  # 强制刷新控制台输出
+            target_files <- if (is.null(target_file)) readline(prompt = "Please enter the selected CSV file: ") else target_file
         }
-    }else if(length(target_files) > 1){
-        # 当获取到多个csv文件，提示手动选择
-        cat("\n",yellow,"Multiple CSV files matched. Please select the target file.",reset,"\n")
-        print(target_files)
-        flush.console()  # 强制刷新控制台输出
-        target_files <- if (is.null(target_file)) readline(prompt = "Please enter the selected CSV file: ") else target_file
-    }
-    
-    target <- read_data(file_path = target_files)
-    target_symbol_name <- names(sapply(target,identify_gene_ID_type) == "SYMBOL")
-    if(length(target_symbol_name) != 1){
-        cat("\n",yellow,"The Head target gene file:",reset,"\n")
-        print(head(target))
-        flush.console()  # 强制刷新控制台输出
-        select_genecol <- if (is.null(target_gene_column)) readline(prompt = "Please select the target gene data column containing the SYMBOL: ") else target_gene_column
-    }else{
-        select_genecol <- target_symbol_name
-    }
-    
-    data$target_gene <- target[[select_genecol]] %>% unique()
-    if( "gene" %in% tolower(select_genecol) ){
-        cat("\n",yellow,"The Head target gene file:",reset,"\n")
-        print(head(target))
-        flush.console()  # 强制刷新控制台输出
-        target_name <- if (is.null(target_name)) readline(prompt = "Please input target name(Show on the Venn plot): ") else target_name
-    }else{
-        target_name <- select_genecol
-    }
-    data$target_gene_name <- target_name
-    
-    # ALL DEGS
-    Intersection_gene_list <- list(data$DEGs, data$target_gene)
-    Intersection_gene_list <- setNames(Intersection_gene_list,c("DEGs",data$target_gene_name))
-    
-    com_genes <- Venn_plot(target_genes = Intersection_gene_list,
-                           target_genes_names = names(Intersection_gene_list),
-                           fill_colors = basicR::get_colors(number = 2.1,package = "ggsci",name = "jco"),
-                           base_size = 1.7,
-                           label_size = 1.5,
-                           sigdigs = 3,  # 设置有效位数
-                           digits = 2,    # 设置小数位数
-                           print_mode = c("percent","raw") # "percent", "raw"
-                          )
-    # Save Plot
-    save_figure(obj = com_genes$plot,
-            filename =  file.path(file.path(data_dir_name,save_dirs[3]),paste0("01_Venn_",paste(names(Intersection_gene_list),collapse = "_"))),
-            width = 6,
-            height = 6,
-            res = 600,
-            formats = c("pdf","png") # "pdf","tiff","png","svg"
-           )
-    
-    # Up DEGs
-    Intersection_gene_list <- list(data$DEGs_Up, data$target_gene)
-    Intersection_gene_list <- setNames(Intersection_gene_list,c("DEGs_Up",data$target_gene_name))
-    
-    com_genes_up <- Venn_plot(target_genes = Intersection_gene_list,
-                           target_genes_names = names(Intersection_gene_list),
-                           fill_colors = basicR::get_colors(number = 2.1,package = "ggsci",name = "jco"),
-                           base_size = 1.7,
-                           label_size = 1.5,
-                           sigdigs = 3,  # 设置有效位数
-                           digits = 2,    # 设置小数位数
-                           print_mode = c("percent","raw") # "percent", "raw"
-                          )
-    # Save Plot
-    save_figure(obj = com_genes_up$plot,
-            filename =  file.path(file.path(data_dir_name,save_dirs[3]),paste0("02_Venn_",paste(names(Intersection_gene_list),collapse = "_"))),
-            width = 6,
-            height = 6,
-            res = 600,
-            formats = c("pdf","png") # "pdf","tiff","png","svg"
-           )
-    
-    
-    
-    # Down DEGs
-    Intersection_gene_list <- list(data$DEGs_Down, data$target_gene)
-    Intersection_gene_list <- setNames(Intersection_gene_list,c("DEGs_Down",data$target_gene_name))
-    
-    com_genes_down <- Venn_plot(target_genes = Intersection_gene_list,
-                           target_genes_names = names(Intersection_gene_list),
-                           fill_colors = basicR::get_colors(number = 2.1,package = "ggsci",name = "jco"),
-                           base_size = 1.7,
-                           label_size = 1.5,
-                           sigdigs = 3,  # 设置有效位数
-                           digits = 2,    # 设置小数位数
-                           print_mode = c("percent","raw") # "percent", "raw"
-                          )
-    # Save Plot
-    save_figure(obj = com_genes_down$plot,
-            filename =  file.path(file.path(data_dir_name,save_dirs[3]),paste0("03_Venn_",paste(names(Intersection_gene_list),collapse = "_"))),
-            width = 6,
-            height = 6,
-            res = 600,
-            formats = c("pdf","png") # "pdf","tiff","png","svg"
-           )
-    
-    # 排序
-    if(file.exists(file.path(data_dir_name,"03_Venn","Target_venn_result.csv"))){
-        df_Venn_target <- read.csv(file.path(data_dir_name,"03_Venn","Target_venn_result.csv"))
-    }else{
-        cat("\n","Target_venn_result.csv Not in '03_Venn' dir, please set the file.")
-        flush.console()
-        target_set <- if (is.null(target_set)) readline(prompt = "Target_venn_result.csv in '03_Venn'?(yes/no): ") else target_set
-        if(tolower(target_set) == "yes"){
-            df_Venn_target <- read.csv(file.path(data_dir_name,"03_Venn","Target_venn_result.csv"))
+        
+        target <- read_data(file_path = target_files)
+        target_symbol_name <- names(sapply(target,identify_gene_ID_type) == "SYMBOL")
+        if(length(target_symbol_name) != 1){
+            cat("\n",yellow,"The Head target gene file:",reset,"\n")
+            print(head(target))
+            flush.console()  # 强制刷新控制台输出
+            select_genecol <- if (is.null(target_gene_column)) readline(prompt = "Please select the target gene data column containing the SYMBOL: ") else target_gene_column
         }else{
-            df_Venn_target <- NULL
+            select_genecol <- target_symbol_name
         }
-    }
-    if(is.null(df_Venn_target)){
-        # 无比较文件，直接使用共有基因
-        com_genes = com_genes$common
-        com_up_genes = com_genes_up$common
-        com_down_genes = com_genes_down$common
-    }else{
-        # 和已有文件对比
-        if(p_value == "p.value"){pnameset = "PValue"}else if(p_value == "p.adj"){pnameset = "adj_PVal"}
-        select_colname <- paste0("Target_venn_logfc_",logFC,"_",pnameset,"_",p)
-        target_Venn_genes <- df_Venn_target[[select_colname]] %>% na.omit()
-    
-        if(setequal(target_Venn_genes, com_genes$common)){
-            com_genes = target_Venn_genes
+        
+        data$target_gene <- target[[select_genecol]] %>% unique()
+        if( "gene" %in% tolower(select_genecol) ){
+            cat("\n",yellow,"The Head target gene file:",reset,"\n")
+            print(head(target))
+            flush.console()  # 强制刷新控制台输出
+            target_name <- if (is.null(target_name)) readline(prompt = "Please input target name(Show on the Venn plot): ") else target_name
         }else{
-            cat("\n",blue,"Target_Venn_genes Not at all in ComVennGenes!",reset,"\n")
-            cat("\n",yellow,"Target_Venn_genes: ",sort(target_Venn_genes),reset,"\n")
-            cat("\n",yellow,"ComVennGenes: ",sort(com_genes$common),reset,"\n")
-            flush.console()
-            quit(save = "no")
+            target_name <- select_genecol
         }
-    }
-    
-    # Com DEGs
-    write.csv(data.frame(Symbol = com_genes),file = file.path(data_dir_name,"03_Venn","01_intersect_genes.csv"))
-    data$common_genes_df <- data.frame(Gene = com_genes,Group = data$target_gene_name)
-    # Com Up DEGs
-    write.csv(data.frame(Symbol = com_up_genes),file = file.path(data_dir_name,"03_Venn","02_intersect_up_genes.csv"))
-    data$common_Up_genes_df <- data.frame(Gene = com_up_genes,Group = data$target_gene_name)
-    # Com Down DEGs
-    write.csv(data.frame(Symbol = com_down_genes),file = file.path(data_dir_name,"03_Venn","03_intersect_down_genes.csv"))
-    data$common_Down_genes_df <- data.frame(Gene = com_down_genes,Group = data$target_gene_name)
-    
-    cat("\n",yellow,"Intersection of DEGs and Target gene: ",nrow(data$common_genes_df),"genes",reset,"\n")
-    print(data$common_genes_df)
-    flush.console()  # 强制刷新控制台输出
-    
-                 
-    ##################################################################################################################    
-    ############################################# Enrich #############################################################
-    ##################################################################################################################
-    cat("\n\n\n",yellow,"Start Enrich Analysis and Plot!",reset,"\n")
-        # Bar Plot ALL        
-        enrich_go_kegg(genes = data$common_genes_df$Gene,
-                        species = data$species, 
-                        p_name = enrich_pname,  # p.value/p.adj
-                        filter_pvalue = 0.05,
-                        pvalueCutoff = 0.5,
-                        qvalueCutoff = 1,
-                        kegg_analysis_method = "online", # online/local
-                        plot_type = enrich_figure_type, # NULL,barplot,dotplot,sankeyplot,circularplot
-                        scankeyplot_mode = "sankey_buble", # buble_sankey/sankey_buble
-                        fill_colors = basicR::get_colors(number = 4.1),
-                        go_kegg_topn = go_kegg_topn,
-                        description_wrap_width = description_wrap_width
-                       ) -> result_enrich
+        data$target_gene_name <- target_name
         
-        write.csv(result_enrich$result,file =file.path(file.path(data_dir_name,"04_Enrich"),paste0("01_GO_KEGG_Enrich_result.csv")))
+        # ALL DEGS
+        Intersection_gene_list <- list(data$DEGs, data$target_gene)
+        Intersection_gene_list <- setNames(Intersection_gene_list,c("DEGs",data$target_gene_name))
         
-        lapply(names(result_enrich$plot[[enrich_figure_type]]),function(type){
-            if(enrich_figure_type == "barplot"){
-                rownum <- nrow(result_enrich$plot[[enrich_figure_type]][[type]]@data)
-                width = 12; height = 1.5 + rownum * 0.5
-            }
-            if(enrich_figure_type == "dotplot"){
-                max_lenth <- result_enrich$plot[[enrich_figure_type]][[type]]@data$Description %>% str_length() %>% max()
-                rownum <- nrow(result_enrich$plot[[enrich_figure_type]][[type]]@data)
-                width = 12 + max_lenth*0.07; height = 1.5 + rownum * 0.4
-            }
-            if(enrich_figure_type == "sankeyplot"){
-                max_lenth <- result_enrich$plot[[enrich_figure_type]][[type]]$layers[[3]]$data$Description %>% str_length() %>% max()
-                rownum <- nrow(result_enrich$plot[[enrich_figure_type]][[type]]$layers[[3]]$data)
-                width = 12 + max_lenth*0.07; height = 4 + rownum * 0.4
-            }    
-            if(enrich_figure_type == "circularplot"){
-                width = 8; height = 8 
-            }
-            if(enrich_figure_type == "treeplot"){
-                width = 8; height = 8 
-            }
-            basicR::save_figure(result_enrich$plot[[enrich_figure_type]][[type]],
-                                filename = file.path(file.path(data_dir_name,"04_Enrich"),paste0("01_",stringr::str_to_title(type),"_",enrich_figure_type)),
-                                width = width, 
-                                height = height, 
-                                res = 600, 
-                                formats = c("pdf","png")
-                               )
-        })
-
-        # Bar Plot Up
-        enrich_go_kegg(genes = data$common_Up_genes_df$Gene,
-                        species = data$species, 
-                        p_name = enrich_pname,  # p.value/p.adj
-                        filter_pvalue = 0.05,
-                        pvalueCutoff = 0.5,
-                        qvalueCutoff = 1,
-                        kegg_analysis_method = "online", # online/local
-                        plot_type = enrich_figure_type, # NULL,barplot,dotplot,sankeyplot,circularplot
-                        scankeyplot_mode = "sankey_buble", # buble_sankey/sankey_buble
-                        fill_colors = basicR::get_colors(number = 4.1),
-                        go_kegg_topn = go_kegg_topn,
-                        description_wrap_width = description_wrap_width
-                       ) -> result_enrich
-        
-        write.csv(result_enrich$result,file =file.path(file.path(data_dir_name,"04_Enrich"),paste0("01_GO_KEGG_Enrich_result_Up.csv")))
-        
-        lapply(names(result_enrich$plot[[enrich_figure_type]]),function(type){
-            if(enrich_figure_type == "barplot"){
-                rownum <- nrow(result_enrich$plot[[enrich_figure_type]][[type]]@data)
-                width = 12; height = 1.5 + rownum * 0.5
-            }
-            if(enrich_figure_type == "dotplot"){
-                max_lenth <- result_enrich$plot[[enrich_figure_type]][[type]]@data$Description %>% str_length() %>% max()
-                rownum <- nrow(result_enrich$plot[[enrich_figure_type]][[type]]@data)
-                width = 12 + max_lenth*0.07; height = 1.5 + rownum * 0.4
-            }
-            if(enrich_figure_type == "sankeyplot"){
-                max_lenth <- result_enrich$plot[[enrich_figure_type]][[type]]$layers[[3]]$data$Description %>% str_length() %>% max()
-                rownum <- nrow(result_enrich$plot[[enrich_figure_type]][[type]]$layers[[3]]$data)
-                width = 12 + max_lenth*0.07; height = 3 + rownum * 0.4
-            }    
-            if(enrich_figure_type == "circularplot"){
-                width = 8; height = 8 
-            }
-            if(enrich_figure_type == "treeplot"){
-                width = 8; height = 8 
-            }
-            
-            basicR::save_figure(result_enrich$plot[[enrich_figure_type]][[type]],
-                                filename = file.path(file.path(data_dir_name,"04_Enrich"),paste0("01_",stringr::str_to_title(type),"_",enrich_figure_type,"_Up")),
-                                width = width, 
-                                height = height, 
-                                res = 600, 
-                                formats = c("pdf","png")
-                               )
-        })
-        
-        # Bar Plot Down
-        enrich_go_kegg(genes = data$common_Down_genes_df$Gene,
-                        species = data$species, 
-                        p_name = enrich_pname,  # p.value/p.adj
-                        filter_pvalue = 0.05,
-                        pvalueCutoff = 0.5,
-                        qvalueCutoff = 1,
-                        kegg_analysis_method = "online", # online/local
-                        plot_type = enrich_figure_type, # NULL,barplot,dotplot,sankeyplot,circularplot
-                        scankeyplot_mode = "sankey_buble", # buble_sankey/sankey_buble
-                        fill_colors = basicR::get_colors(number = 4.1),
-                        go_kegg_topn = go_kegg_topn,
-                        description_wrap_width = description_wrap_width
-                       ) -> result_enrich
-        
-        write.csv(result_enrich$result,file =file.path(file.path(data_dir_name,"04_Enrich"),paste0("01_GO_KEGG_Enrich_result_Down.csv")))
-        
-        lapply(names(result_enrich$plot[[enrich_figure_type]]),function(type){
-            if(enrich_figure_type == "barplot"){
-                rownum <- nrow(result_enrich$plot[[enrich_figure_type]][[type]]@data)
-                width = 12; height = 1.5 + rownum * 0.5
-            }
-            if(enrich_figure_type == "dotplot"){
-                max_lenth <- result_enrich$plot[[enrich_figure_type]][[type]]@data$Description %>% str_length() %>% max()
-                rownum <- nrow(result_enrich$plot[[enrich_figure_type]][[type]]@data)
-                width = 12 + max_lenth*0.07; height = 1.5 + rownum * 0.4
-            }
-            if(enrich_figure_type == "sankeyplot"){
-                max_lenth <- result_enrich$plot[[enrich_figure_type]][[type]]$layers[[3]]$data$Description %>% str_length() %>% max()
-                rownum <- nrow(result_enrich$plot[[enrich_figure_type]][[type]]$layers[[3]]$data)
-                width = 12 + max_lenth*0.07; height = 4 + rownum * 0.4
-            }    
-            if(enrich_figure_type == "circularplot"){
-                width = 8; height = 8 
-            }
-            if(enrich_figure_type == "treeplot"){
-                width = 8; height = 8 
-            }
-            
-            basicR::save_figure(result_enrich$plot[[enrich_figure_type]][[type]],
-                                filename = file.path(file.path(data_dir_name,"04_Enrich"),paste0("01_",stringr::str_to_title(type),"_",enrich_figure_type,"_Down")),
-                                width = width, 
-                                height = height, 
-                                res = 600, 
-                                formats = c("pdf","png")
-                               )
-        }) 
-      
-    ###################################################    PPI  #############################################################
-    
-    cat("\n\n\n",yellow,"Start PPI analysis and Plot!",reset,"\n")
-    # 获区PPI string 数据
-    ppi_df <- string_ppi_get_data(genes = data$common_genes_df$Gene, required_score = confidence, species = data$species)
-    write.csv(ppi_df,file = file.path(data_dir_name,"05_PPI","00_string_interactions.csv"))
-    
-    ppi_df_select <- ppi_df %>% dplyr::select(preferredName_A,preferredName_B,score)
-    
-    node_df <- table(c(ppi_df_select$preferredName_A,ppi_df_select$preferredName_B)) %>% as.data.frame() %>% setNames(c("Gene","Dgree"))
-    node_df <- merge(node_df,data$common_genes_df,by = "Gene")
-    
-    net <- network_graph_plot(edge_df = ppi_df_select,node_df = node_df,
-                              edge_from_colname = "preferredName_A",edge_to_colname = "preferredName_B",
-                              edge_weight_colname = "score",edge_group_colname = "preferredName_A",edge_group_levels = NULL,
-                              node_name_colname = "Gene",node_group_colname = "Group",node_size_colname = "Dgree",
-                              node_group_levels = NULL,node_levels = NULL,
-                              sources_use = NULL, targets_use = NULL, top_n = 1, # 筛选相互关系的top数据
-                              plot_circular = TRUE,layout_type = "linear", 
-                              label_size = 4,label_repel = FALSE,base_size = 14,
-                              ggraph_node_angle= TRUE,
-                              label_radius_ratio = 1.1,label_align_mode = "inner",  # "center","inner","outer"
-                              ggraph_center_node_angle = FALSE,
-                              label_radius_center_ratio = 1,label_align_center_mode = "center",  # "center","inner","outer"
-                              edge_directed = FALSE,
-                              edge_arrow = FALSE,
-                              edge_arrow_length = 4,
-                              edge_arrow_angle = 20,
-                              edge_arrow_type =  "closed",
-                              edge_radian = -5,
-                              edge_width_range = c(0.5,1.5),
-                              node_size_range = c(3, 8),
-                              node_shape = FALSE,node_center = NULL, # unique(df_miRNA_TF$mRNA),NULL
-                              node_group_color = c(basicR::get_colors(number = 10.1,package = "ggsci",name = "jco"),basicR::get_colors(number = 50.1)),
-                              edge_group_color = c(basicR::get_colors(number = 100.1),basicR::get_colors(number = 100.1)),
-                              legend_position = "right",legend_box_spacing = 15,
-                              legend_boolean_NodeColor_NodeSize_EdgeColor_EdgeSize = c(FALSE,FALSE,FALSE,FALSE),
-                              legend_ncol_NodeColor_NodeSize_EdgeColor_EdgeSize = c(1,1,1,1),
-                              legend_keysizescale_NodeColor_NodeSize_EdgeColor_EdgeSize = c(1,0.02,1,1),
-                              legend_breaknumber_NodeSize_EdgeSize = c(3,3),
-                              legend_numberdigits_NodeSize_EdgeSize = c(0,3),
-                              legend_title_position_NodeColor_NodeSize_EdgeColor_EdgeSize = c(rep("top",4)),
-                              legend_title_hjust_NodeColor_NodeSize_EdgeColor_EdgeSize = c(rep(0,4)),
-                              legend_title_vjust_NodeColor_NodeSize_EdgeColor_EdgeSize = c(rep(0.5,4)),
-                              legend_layout = NULL,legend_every_position = NULL,
-                              title_name = "",
-                              plot_margin = c(15,15,10,15)  # 边距 b,l,t,r 
-                      )
-    
-    save_figure(obj = net$ggplotGrob_data,
-                filename =  file.path(file.path(data_dir_name,"05_PPI"),paste0("01_Network.pdf")),
-                width = 7,
-                height = 7,
+        com_genes <- Venn_plot(target_genes = Intersection_gene_list,
+                               target_genes_names = names(Intersection_gene_list),
+                               fill_colors = basicR::get_colors(number = 2.1,package = "ggsci",name = "jco"),
+                               base_size = 1.7,
+                               label_size = 1.5,
+                               sigdigs = 3,  # 设置有效位数
+                               digits = 2,    # 设置小数位数
+                               print_mode = c("percent","raw") # "percent", "raw"
+                              )
+        # Save Plot
+        save_figure(obj = com_genes$plot,
+                filename =  file.path(file.path(data_dir_name,save_dirs[3]),paste0("01_Venn_",paste(names(Intersection_gene_list),collapse = "_"))),
+                width = 6,
+                height = 6,
                 res = 600,
                 formats = c("pdf","png") # "pdf","tiff","png","svg"
                )
+        
+        # Up DEGs
+        Intersection_gene_list <- list(data$DEGs_Up, data$target_gene)
+        Intersection_gene_list <- setNames(Intersection_gene_list,c("DEGs_Up",data$target_gene_name))
+        
+        com_genes_up <- Venn_plot(target_genes = Intersection_gene_list,
+                               target_genes_names = names(Intersection_gene_list),
+                               fill_colors = basicR::get_colors(number = 2.1,package = "ggsci",name = "jco"),
+                               base_size = 1.7,
+                               label_size = 1.5,
+                               sigdigs = 3,  # 设置有效位数
+                               digits = 2,    # 设置小数位数
+                               print_mode = c("percent","raw") # "percent", "raw"
+                              )
+        # Save Plot
+        save_figure(obj = com_genes_up$plot,
+                filename =  file.path(file.path(data_dir_name,save_dirs[3]),paste0("02_Venn_",paste(names(Intersection_gene_list),collapse = "_"))),
+                width = 6,
+                height = 6,
+                res = 600,
+                formats = c("pdf","png") # "pdf","tiff","png","svg"
+               )
+        
+        
+        
+        # Down DEGs
+        Intersection_gene_list <- list(data$DEGs_Down, data$target_gene)
+        Intersection_gene_list <- setNames(Intersection_gene_list,c("DEGs_Down",data$target_gene_name))
+        
+        com_genes_down <- Venn_plot(target_genes = Intersection_gene_list,
+                               target_genes_names = names(Intersection_gene_list),
+                               fill_colors = basicR::get_colors(number = 2.1,package = "ggsci",name = "jco"),
+                               base_size = 1.7,
+                               label_size = 1.5,
+                               sigdigs = 3,  # 设置有效位数
+                               digits = 2,    # 设置小数位数
+                               print_mode = c("percent","raw") # "percent", "raw"
+                              )
+        # Save Plot
+        save_figure(obj = com_genes_down$plot,
+                filename =  file.path(file.path(data_dir_name,save_dirs[3]),paste0("03_Venn_",paste(names(Intersection_gene_list),collapse = "_"))),
+                width = 6,
+                height = 6,
+                res = 600,
+                formats = c("pdf","png") # "pdf","tiff","png","svg"
+               )
+        
+        # 排序
+        if(file.exists(file.path(data_dir_name,"03_Venn","Target_venn_result.csv"))){
+            df_Venn_target <- read.csv(file.path(data_dir_name,"03_Venn","Target_venn_result.csv"))
+        }else{
+            cat("\n","Target_venn_result.csv Not in '03_Venn' dir, please set the file.")
+            flush.console()
+            target_set <- if (is.null(target_set)) readline(prompt = "Target_venn_result.csv in '03_Venn'?(yes/no): ") else target_set
+            if(tolower(target_set) == "yes"){
+                df_Venn_target <- read.csv(file.path(data_dir_name,"03_Venn","Target_venn_result.csv"))
+            }else{
+                df_Venn_target <- NULL
+            }
+        }
+        if(is.null(df_Venn_target)){
+            # 无比较文件，直接使用共有基因
+            com_genes = com_genes$common
+            com_up_genes = com_genes_up$common
+            com_down_genes = com_genes_down$common
+        }else{
+            # 和已有文件对比
+            if(p_value == "p.value"){pnameset = "PValue"}else if(p_value == "p.adj"){pnameset = "adj_PVal"}
+            select_colname <- paste0("Target_venn_logfc_",logFC,"_",pnameset,"_",p)
+            target_Venn_genes <- df_Venn_target[[select_colname]] %>% na.omit()
+        
+            if(setequal(target_Venn_genes, com_genes$common)){
+                com_genes = target_Venn_genes
+            }else{
+                cat("\n",blue,"Target_Venn_genes Not at all in ComVennGenes!",reset,"\n")
+                cat("\n",yellow,"Target_Venn_genes: ",sort(target_Venn_genes),reset,"\n")
+                cat("\n",yellow,"ComVennGenes: ",sort(com_genes$common),reset,"\n")
+                flush.console()
+                quit(save = "no")
+            }
+        }
+        
+        # Com DEGs
+        write.csv(data.frame(Symbol = com_genes),file = file.path(data_dir_name,"03_Venn","01_intersect_genes.csv"))
+        data$common_genes_df <- data.frame(Gene = com_genes,Group = data$target_gene_name)
+        # Com Up DEGs
+        write.csv(data.frame(Symbol = com_up_genes),file = file.path(data_dir_name,"03_Venn","02_intersect_up_genes.csv"))
+        data$common_Up_genes_df <- data.frame(Gene = com_up_genes,Group = data$target_gene_name)
+        # Com Down DEGs
+        write.csv(data.frame(Symbol = com_down_genes),file = file.path(data_dir_name,"03_Venn","03_intersect_down_genes.csv"))
+        data$common_Down_genes_df <- data.frame(Gene = com_down_genes,Group = data$target_gene_name)
+        
+        cat("\n",yellow,"Intersection of DEGs and Target gene: ",nrow(data$common_genes_df),"genes",reset,"\n")
+        print(data$common_genes_df)
+        flush.console()  # 强制刷新控制台输出
     
-    write.csv(node_df,file = file.path(data_dir_name,"05_PPI","01_Node_Data.csv"))
-    # save data
-    saveRDS(data,file = file.path(data_dir_name,"00_data_result","02_data.rds"))
+    }else{
+        # 无target_file ，直接对差异基因富集
+        data$common_genes_df$Gene <- data$DEGs
+        data$common_Up_genes_df$Gene <- data$DEGs_Up
+        data$common_Down_genes_df$Gene <- data$DEGs_Down
+    }             
+    ##################################################################################################################    
+    ############################################# Enrich #############################################################
+    ##################################################################################################################
 
+    if(Enrich){
+        cat("\n\n\n",yellow,"Start Enrich Analysis and Plot!",reset,"\n")
+            # Bar Plot ALL        
+            enrich_go_kegg(genes = data$common_genes_df$Gene,
+                            species = data$species, 
+                            p_name = enrich_pname,  # p.value/p.adj
+                            filter_pvalue = 0.05,
+                            pvalueCutoff = 0.5,
+                            qvalueCutoff = 1,
+                            kegg_analysis_method = "online", # online/local
+                            plot_type = enrich_figure_type, # NULL,barplot,dotplot,sankeyplot,circularplot
+                            scankeyplot_mode = "sankey_buble", # buble_sankey/sankey_buble
+                            fill_colors = basicR::get_colors(number = 4.1),
+                            go_kegg_topn = go_kegg_topn,
+                            description_wrap_width = description_wrap_width
+                           ) -> result_enrich
+            
+            write.csv(result_enrich$result,file =file.path(file.path(data_dir_name,"04_Enrich"),paste0("01_GO_KEGG_Enrich_result.csv")))
+            
+            lapply(names(result_enrich$plot[[enrich_figure_type]]),function(type){
+                if(enrich_figure_type == "barplot"){
+                    rownum <- nrow(result_enrich$plot[[enrich_figure_type]][[type]]@data)
+                    width = 12; height = 1.5 + rownum * 0.5
+                }
+                if(enrich_figure_type == "dotplot"){
+                    max_lenth <- result_enrich$plot[[enrich_figure_type]][[type]]@data$Description %>% str_length() %>% max()
+                    rownum <- nrow(result_enrich$plot[[enrich_figure_type]][[type]]@data)
+                    width = 12 + max_lenth*0.07; height = 1.5 + rownum * 0.4
+                }
+                if(enrich_figure_type == "sankeyplot"){
+                    max_lenth <- result_enrich$plot[[enrich_figure_type]][[type]]$layers[[3]]$data$Description %>% str_length() %>% max()
+                    rownum <- nrow(result_enrich$plot[[enrich_figure_type]][[type]]$layers[[3]]$data)
+                    width = 12 + max_lenth*0.07; height = 4 + rownum * 0.4
+                }    
+                if(enrich_figure_type == "circularplot"){
+                    width = 8; height = 8 
+                }
+                if(enrich_figure_type == "treeplot"){
+                    width = 8; height = 8 
+                }
+                basicR::save_figure(result_enrich$plot[[enrich_figure_type]][[type]],
+                                    filename = file.path(file.path(data_dir_name,"04_Enrich"),paste0("01_",stringr::str_to_title(type),"_",enrich_figure_type)),
+                                    width = width, 
+                                    height = height, 
+                                    res = 600, 
+                                    formats = c("pdf","png")
+                                   )
+            })
+    
+            # Bar Plot Up
+            enrich_go_kegg(genes = data$common_Up_genes_df$Gene,
+                            species = data$species, 
+                            p_name = enrich_pname,  # p.value/p.adj
+                            filter_pvalue = 0.05,
+                            pvalueCutoff = 0.5,
+                            qvalueCutoff = 1,
+                            kegg_analysis_method = "online", # online/local
+                            plot_type = enrich_figure_type, # NULL,barplot,dotplot,sankeyplot,circularplot
+                            scankeyplot_mode = "sankey_buble", # buble_sankey/sankey_buble
+                            fill_colors = basicR::get_colors(number = 4.1),
+                            go_kegg_topn = go_kegg_topn,
+                            description_wrap_width = description_wrap_width
+                           ) -> result_enrich
+            
+            write.csv(result_enrich$result,file =file.path(file.path(data_dir_name,"04_Enrich"),paste0("01_GO_KEGG_Enrich_result_Up.csv")))
+            
+            lapply(names(result_enrich$plot[[enrich_figure_type]]),function(type){
+                if(enrich_figure_type == "barplot"){
+                    rownum <- nrow(result_enrich$plot[[enrich_figure_type]][[type]]@data)
+                    width = 12; height = 1.5 + rownum * 0.5
+                }
+                if(enrich_figure_type == "dotplot"){
+                    max_lenth <- result_enrich$plot[[enrich_figure_type]][[type]]@data$Description %>% str_length() %>% max()
+                    rownum <- nrow(result_enrich$plot[[enrich_figure_type]][[type]]@data)
+                    width = 12 + max_lenth*0.07; height = 1.5 + rownum * 0.4
+                }
+                if(enrich_figure_type == "sankeyplot"){
+                    max_lenth <- result_enrich$plot[[enrich_figure_type]][[type]]$layers[[3]]$data$Description %>% str_length() %>% max()
+                    rownum <- nrow(result_enrich$plot[[enrich_figure_type]][[type]]$layers[[3]]$data)
+                    width = 12 + max_lenth*0.07; height = 3 + rownum * 0.4
+                }    
+                if(enrich_figure_type == "circularplot"){
+                    width = 8; height = 8 
+                }
+                if(enrich_figure_type == "treeplot"){
+                    width = 8; height = 8 
+                }
+                
+                basicR::save_figure(result_enrich$plot[[enrich_figure_type]][[type]],
+                                    filename = file.path(file.path(data_dir_name,"04_Enrich"),paste0("01_",stringr::str_to_title(type),"_",enrich_figure_type,"_Up")),
+                                    width = width, 
+                                    height = height, 
+                                    res = 600, 
+                                    formats = c("pdf","png")
+                                   )
+            })
+            
+            # Bar Plot Down
+            enrich_go_kegg(genes = data$common_Down_genes_df$Gene,
+                            species = data$species, 
+                            p_name = enrich_pname,  # p.value/p.adj
+                            filter_pvalue = 0.05,
+                            pvalueCutoff = 0.5,
+                            qvalueCutoff = 1,
+                            kegg_analysis_method = "online", # online/local
+                            plot_type = enrich_figure_type, # NULL,barplot,dotplot,sankeyplot,circularplot
+                            scankeyplot_mode = "sankey_buble", # buble_sankey/sankey_buble
+                            fill_colors = basicR::get_colors(number = 4.1),
+                            go_kegg_topn = go_kegg_topn,
+                            description_wrap_width = description_wrap_width
+                           ) -> result_enrich
+            
+            write.csv(result_enrich$result,file =file.path(file.path(data_dir_name,"04_Enrich"),paste0("01_GO_KEGG_Enrich_result_Down.csv")))
+            
+            lapply(names(result_enrich$plot[[enrich_figure_type]]),function(type){
+                if(enrich_figure_type == "barplot"){
+                    rownum <- nrow(result_enrich$plot[[enrich_figure_type]][[type]]@data)
+                    width = 12; height = 1.5 + rownum * 0.5
+                }
+                if(enrich_figure_type == "dotplot"){
+                    max_lenth <- result_enrich$plot[[enrich_figure_type]][[type]]@data$Description %>% str_length() %>% max()
+                    rownum <- nrow(result_enrich$plot[[enrich_figure_type]][[type]]@data)
+                    width = 12 + max_lenth*0.07; height = 1.5 + rownum * 0.4
+                }
+                if(enrich_figure_type == "sankeyplot"){
+                    max_lenth <- result_enrich$plot[[enrich_figure_type]][[type]]$layers[[3]]$data$Description %>% str_length() %>% max()
+                    rownum <- nrow(result_enrich$plot[[enrich_figure_type]][[type]]$layers[[3]]$data)
+                    width = 12 + max_lenth*0.07; height = 4 + rownum * 0.4
+                }    
+                if(enrich_figure_type == "circularplot"){
+                    width = 8; height = 8 
+                }
+                if(enrich_figure_type == "treeplot"){
+                    width = 8; height = 8 
+                }
+                
+                basicR::save_figure(result_enrich$plot[[enrich_figure_type]][[type]],
+                                    filename = file.path(file.path(data_dir_name,"04_Enrich"),paste0("01_",stringr::str_to_title(type),"_",enrich_figure_type,"_Down")),
+                                    width = width, 
+                                    height = height, 
+                                    res = 600, 
+                                    formats = c("pdf","png")
+                                   )
+            }) 
+   }   
+    ###################################################    PPI  #############################################################
+    if(PPI){
+        cat("\n\n\n",yellow,"Start PPI analysis and Plot!",reset,"\n")
+        # 获区PPI string 数据
+        ppi_df <- string_ppi_get_data(genes = data$common_genes_df$Gene, required_score = confidence, species = data$species)
+        write.csv(ppi_df,file = file.path(data_dir_name,"05_PPI","00_string_interactions.csv"))
+        
+        ppi_df_select <- ppi_df %>% dplyr::select(preferredName_A,preferredName_B,score)
+        
+        node_df <- table(c(ppi_df_select$preferredName_A,ppi_df_select$preferredName_B)) %>% as.data.frame() %>% setNames(c("Gene","Dgree"))
+        node_df <- merge(node_df,data$common_genes_df,by = "Gene")
+        
+        net <- network_graph_plot(edge_df = ppi_df_select,node_df = node_df,
+                                  edge_from_colname = "preferredName_A",edge_to_colname = "preferredName_B",
+                                  edge_weight_colname = "score",edge_group_colname = "preferredName_A",edge_group_levels = NULL,
+                                  node_name_colname = "Gene",node_group_colname = "Group",node_size_colname = "Dgree",
+                                  node_group_levels = NULL,node_levels = NULL,
+                                  sources_use = NULL, targets_use = NULL, top_n = 1, # 筛选相互关系的top数据
+                                  plot_circular = TRUE,layout_type = "linear", 
+                                  label_size = 4,label_repel = FALSE,base_size = 14,
+                                  ggraph_node_angle= TRUE,
+                                  label_radius_ratio = 1.1,label_align_mode = "inner",  # "center","inner","outer"
+                                  ggraph_center_node_angle = FALSE,
+                                  label_radius_center_ratio = 1,label_align_center_mode = "center",  # "center","inner","outer"
+                                  edge_directed = FALSE,
+                                  edge_arrow = FALSE,
+                                  edge_arrow_length = 4,
+                                  edge_arrow_angle = 20,
+                                  edge_arrow_type =  "closed",
+                                  edge_radian = -5,
+                                  edge_width_range = c(0.5,1.5),
+                                  node_size_range = c(3, 8),
+                                  node_shape = FALSE,node_center = NULL, # unique(df_miRNA_TF$mRNA),NULL
+                                  node_group_color = c(basicR::get_colors(number = 10.1,package = "ggsci",name = "jco"),basicR::get_colors(number = 50.1)),
+                                  edge_group_color = c(basicR::get_colors(number = 100.1),basicR::get_colors(number = 100.1)),
+                                  legend_position = "right",legend_box_spacing = 15,
+                                  legend_boolean_NodeColor_NodeSize_EdgeColor_EdgeSize = c(FALSE,FALSE,FALSE,FALSE),
+                                  legend_ncol_NodeColor_NodeSize_EdgeColor_EdgeSize = c(1,1,1,1),
+                                  legend_keysizescale_NodeColor_NodeSize_EdgeColor_EdgeSize = c(1,0.02,1,1),
+                                  legend_breaknumber_NodeSize_EdgeSize = c(3,3),
+                                  legend_numberdigits_NodeSize_EdgeSize = c(0,3),
+                                  legend_title_position_NodeColor_NodeSize_EdgeColor_EdgeSize = c(rep("top",4)),
+                                  legend_title_hjust_NodeColor_NodeSize_EdgeColor_EdgeSize = c(rep(0,4)),
+                                  legend_title_vjust_NodeColor_NodeSize_EdgeColor_EdgeSize = c(rep(0.5,4)),
+                                  legend_layout = NULL,legend_every_position = NULL,
+                                  title_name = "",
+                                  plot_margin = c(15,15,10,15)  # 边距 b,l,t,r 
+                          )
+        
+        save_figure(obj = net$ggplotGrob_data,
+                    filename =  file.path(file.path(data_dir_name,"05_PPI"),paste0("01_Network.pdf")),
+                    width = 7,
+                    height = 7,
+                    res = 600,
+                    formats = c("pdf","png") # "pdf","tiff","png","svg"
+                   )
+        
+        write.csv(node_df,file = file.path(data_dir_name,"05_PPI","01_Node_Data.csv"))
+    }
     return(Res$result)
 }
