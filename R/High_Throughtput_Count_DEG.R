@@ -91,65 +91,74 @@ High_Throughtput_Count_DEG <- function(expr = data$expr,
                                        p = 0.05, 
                                        change = c("Up","Down","Not")
                                       ){
-      # 高通量数据差异分析
-      if(!dir.exists(DEG_output_dir)){dir.create(DEG_output_dir,recursive = T)}
-      if(p_value == "p.adj"){
-        pvalue <- "p.adj"
-      }else{
-        pvalue <- "p.value"
-      }
-      
-      # DEseq2
-      if(any(grepl("Raw_Group",colnames(condition)))){condition$Raw_Group <- NULL}
-      condition$Group <- factor(condition$Group,levels = group_order)
-      
-      # 按照分组顺序排序 分组样本顺序和表达数据样本顺序  
-      condition <- condition %>% arrange(Group)
-      if("sample" %in% colnames(condition)) {
-          expr <- expr %>% dplyr::select(condition$sample)
-      }else{
-          expr <- expr %>% dplyr::select(rownames(condition))
-      } 
-      
+    # colors
+    red <- "\033[31m"
+    green <- "\033[32m"
+    yellow <- "\033[33m"
+    blue <- "\033[34m"
+    magenta <- "\033[35m"
+    cyan <- "\033[36m"
+    reset <- "\033[0m"
     
-      dds <- DESeqDataSetFromMatrix(countData = expr, # 表达矩阵
-                                    colData = condition,        # 表达矩阵列名和分组信息的对应关系
-                                    design = ~ Group)         # group为colData中的group，也就是分组信息 
-      # 低表达基因过滤
-      if(expr_cutoff == 0){
-          filter_dds <- rowSums(counts(dds) > expr_cutoff) > filter_sample_num
-      }else{
-          filter_dds <- rowSums(counts(dds) >= expr_cutoff) > filter_sample_num
-      }
-      
-      
+    # 高通量数据差异分析
+    if(!dir.exists(DEG_output_dir)){dir.create(DEG_output_dir,recursive = T)}
+    if(p_value == "p.adj"){
+    pvalue <- "p.adj"
+    }else{
+    pvalue <- "p.value"
+    }
     
-      dds <- dds[filter_dds,]  
-      dds <- DESeq(dds)
-      res = results(dds, independentFiltering = FALSE, c("Group",group_order[1],group_order[2]), alpha = 0.1)
-      cat("\n",yellow,"The Summary Res: ",reset,"\n")
-      print(summary(res)) 
-      flush.console()  # 强制刷新控制台输出
-      
-      resdata <- merge(as.data.frame(res), as.data.frame(log2(counts(dds,normalized=TRUE) + 1) ), by="row.names", sort=FALSE) 
-      rownames(resdata) <- resdata$Row.names
-      resdata$Row.names <- NULL
-      #norm_exp <- as.data.frame(counts(dds,normalized=TRUE)) 
-      norm_exp <- as.data.frame(assay(vst(dds, blind = FALSE)))
-      resOrdered <- resdata[order(resdata$padj), ]
-      RES <- as.data.frame(resOrdered) %>% na.omit(DEG) 
-      RES <- RES %>% dplyr::rename('logFC' = 'log2FoldChange', 'p.adj' = 'padj', 'p.value' = 'pvalue')
-      RES$sig = as.factor(ifelse(RES[[pvalue]] < p & abs(RES$logFC) > logFC,
-                                 ifelse(RES$logFC > logFC,
-                                        change[1],
-                                        change[2]),
-                                 change[3]))
-      write.csv(RES, file = file.path(DEG_output_dir,"01_Deseq2_Res.csv"))
-      write.csv(norm_exp, file = file.path(Exp_output_dir,"01_Expression_throughput_vst_Norm.csv"))
+    # DEseq2
+    if(any(grepl("Raw_Group",colnames(condition)))){condition$Raw_Group <- NULL}
+    condition$Group <- factor(condition$Group,levels = group_order)
     
-      cat("\n","\033[33m","Difference conditions: logFC >",logFC,"&",pvalue,"< ",p,"\033[0m")
-      cat("\n","\033[33m","Number of differential genes：","\033[0m","\n")
-      print(table(RES$sig))
-      flush.console()  # 强制刷新控制台输出
-      return(RES)
+    # 按照分组顺序排序 分组样本顺序和表达数据样本顺序  
+    condition <- condition %>% arrange(Group)
+    if("sample" %in% colnames(condition)) {
+      expr <- expr %>% dplyr::select(condition$sample)
+    }else{
+      expr <- expr %>% dplyr::select(rownames(condition))
+    } 
+    
+    
+    dds <- DESeqDataSetFromMatrix(countData = expr, # 表达矩阵
+                                colData = condition,        # 表达矩阵列名和分组信息的对应关系
+                                design = ~ Group)         # group为colData中的group，也就是分组信息 
+    # 低表达基因过滤
+    if(expr_cutoff == 0){
+      filter_dds <- rowSums(counts(dds) > expr_cutoff) > filter_sample_num
+    }else{
+      filter_dds <- rowSums(counts(dds) >= expr_cutoff) > filter_sample_num
+    }
+    
+    
+    
+    dds <- dds[filter_dds,]  
+    dds <- DESeq(dds)
+    res = results(dds, independentFiltering = FALSE, c("Group",group_order[1],group_order[2]), alpha = 0.1)
+    cat("\n",yellow,"The Summary Res: ",reset,"\n")
+    print(summary(res)) 
+    flush.console()  # 强制刷新控制台输出
+    
+    resdata <- merge(as.data.frame(res), as.data.frame(log2(counts(dds,normalized=TRUE) + 1) ), by="row.names", sort=FALSE) 
+    rownames(resdata) <- resdata$Row.names
+    resdata$Row.names <- NULL
+    #norm_exp <- as.data.frame(counts(dds,normalized=TRUE)) 
+    norm_exp <- as.data.frame(assay(vst(dds, blind = FALSE)))
+    resOrdered <- resdata[order(resdata$padj), ]
+    RES <- as.data.frame(resOrdered) %>% na.omit(DEG) 
+    RES <- RES %>% dplyr::rename('logFC' = 'log2FoldChange', 'p.adj' = 'padj', 'p.value' = 'pvalue')
+    RES$sig = as.factor(ifelse(RES[[pvalue]] < p & abs(RES$logFC) > logFC,
+                             ifelse(RES$logFC > logFC,
+                                    change[1],
+                                    change[2]),
+                             change[3]))
+    write.csv(RES, file = file.path(DEG_output_dir,"01_Deseq2_Res.csv"))
+    write.csv(norm_exp, file = file.path(Exp_output_dir,"01_Expression_throughput_vst_Norm.csv"))
+    
+    cat("\n","\033[33m","Difference conditions: logFC >",logFC,"&",pvalue,"< ",p,"\033[0m")
+    cat("\n","\033[33m","Number of differential genes：","\033[0m","\n")
+    print(table(RES$sig))
+    flush.console()  # 强制刷新控制台输出
+    return(RES)
 } 
