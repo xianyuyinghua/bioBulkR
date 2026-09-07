@@ -213,7 +213,10 @@ geodata_train_plot_degs <- function(
     sample_group <- read.csv(file.path(data_dir_name,save_dirs[1],"02_Condition.csv"),row.names = 1)
     if( "group" %in% colnames(sample_group) ){
         sample_group$group <- stringr::str_to_title(sample_group$group)
-        sample_group <- sample_group %>% dplyr::rename( "Group" = "group") %>% tibble::column_to_rownames("sample")
+        sample_group <- sample_group %>% dplyr::rename("Group" = "group")
+        if("sample" %in% colnames(sample_group)){
+            sample_group <- sample_group %>% tibble::column_to_rownames("sample")
+        }
         write.csv(sample_group,file = file.path(data_dir_name,save_dirs[1],"02_Condition.csv"))
     }else{
         head(sample_group)
