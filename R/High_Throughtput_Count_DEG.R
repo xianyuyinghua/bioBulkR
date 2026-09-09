@@ -144,7 +144,18 @@ High_Throughtput_Count_DEG <- function(expr = data$expr,
     rownames(resdata) <- resdata$Row.names
     resdata$Row.names <- NULL
     #norm_exp <- as.data.frame(counts(dds,normalized=TRUE)) 
-    norm_exp <- as.data.frame(assay(vst(dds, blind = FALSE)))
+    #norm_exp <- as.data.frame(assay(vst(dds, blind = FALSE)))
+    norm_exp <- tryCatch(
+    {as.data.frame(assay(vst(dds, blind = FALSE)))},
+    error = function(e1){
+        message("vst failed, switching to varianceStabilizingTransformation")
+        tryCatch(
+            {as.data.frame(assay(varianceStabilizingTransformation(dds,blind = FALSE)))},
+            error = function(e2){
+                message("VST transformation failed, using log2 normalized counts")
+                as.data.frame(log2(counts(dds,normalized = TRUE) + 1))
+            })
+    })
     resOrdered <- resdata[order(resdata$padj), ]
     RES <- as.data.frame(resOrdered) %>% na.omit(DEG) 
     RES <- RES %>% dplyr::rename('logFC' = 'log2FoldChange', 'p.adj' = 'padj', 'p.value' = 'pvalue')
