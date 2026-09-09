@@ -80,7 +80,12 @@ Venn_plot <- function(target_genes = list(data$DEGs,data$target_gene),
     
       if(length(target_genes) == 2){
         if(length(target_genes[[1]]) < length(target_genes[[2]])){
-            inverted_use <- TRUE
+            if(all(target_genes[[1]] %in% target_genes[[2]])){
+                inverted_use <- FALSE 
+            }else{
+                inverted_use <- TRUE
+            }
+            
         }else{
             inverted_use <- FALSE
         }
