@@ -78,36 +78,52 @@ Venn_plot <- function(target_genes = list(data$DEGs,data$target_gene),
     
       futile.logger::flog.threshold(futile.logger::ERROR, name = "VennDiagramLogger")  # 抑制日志信息
     
-      if(length(target_genes) == 2){
-        if(length(target_genes[[1]]) < length(target_genes[[2]])){
-            if(all(target_genes[[1]] %in% target_genes[[2]])){
-                inverted_use <- FALSE 
-            }else{
-                inverted_use <- TRUE
+          if(length(target_genes) == 2){
+            inverted_use <- length(target_genes[[1]]) < length(target_genes[[2]]) && !all(target_genes[[1]] %in% target_genes[[2]])
+              
+            venn_ploy <- VennDiagram::venn.diagram(x = setNames(target_genes,target_genes_names),
+                                                   filename = NULL,
+                                                   scaled = FALSE,
+                                                   inverted = inverted_use,
+                                                   fill = fill_color,
+                                                   print.mode = print_mode,
+                                                   col = fill_color,
+                                                   sigdigs = 2,
+                                                   cat.pos = c(180,180),
+                                                   margin = 0.1,
+                                                   lwd = 0,
+                                                   cex = label_size,
+                                                   cat.cex = base_size,
+                                                   disable.logging = TRUE,
+                                                   fontfamily = font,
+                                                   cat.fontfamily = font
+                                                  )
+              if(isTRUE(inverted_use)){
+                text_indices <- which(
+                    sapply(venn_ploy, function(x) inherits(x, "text"))
+                )
+        
+                region_indices <- text_indices[
+                    !sapply(
+                        venn_ploy[text_indices],
+                        function(x) as.character(x$label) %in% target_genes_names
+                    )
+                ]
+        
+                region_x <- sapply(
+                    venn_ploy[region_indices],
+                    function(x) as.numeric(x$x)
+                )
+        
+                left_idx  <- region_indices[which.min(region_x)]
+                right_idx <- region_indices[which.max(region_x)]
+        
+                tmp <- venn_ploy[[left_idx]]$label
+                venn_ploy[[left_idx]]$label <- venn_ploy[[right_idx]]$label
+                venn_ploy[[right_idx]]$label <- tmp
             }
-            
-        }else{
-            inverted_use <- FALSE
-        }
-        venn_ploy <- VennDiagram::venn.diagram(x = setNames(target_genes,target_genes_names),
-                                               filename = NULL,
-                                               scaled = FALSE,
-                                               inverted = inverted_use,
-                                               fill = fill_color,
-                                               print.mode = print_mode,
-                                               col = fill_color,
-                                               sigdigs = 2,
-                                               cat.pos = c(180,180),
-                                               margin = 0.1,
-                                               lwd = 0,
-                                               cex = label_size,
-                                               cat.cex = base_size,
-                                               disable.logging = TRUE,
-                                               fontfamily = font,
-                                               cat.fontfamily = font
-                                              )
-      }else{
-        venn_ploy <- VennDiagram::venn.diagram(x = setNames(target_genes,target_genes_names),
+          }else{
+          venn_ploy <- VennDiagram::venn.diagram(x = setNames(target_genes,target_genes_names),
                                                filename = NULL,
                                                scaled = FALSE ,
                                                 fill = fill_color,
