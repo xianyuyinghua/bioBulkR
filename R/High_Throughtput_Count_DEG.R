@@ -91,6 +91,7 @@ High_Throughtput_Count_DEG <- function(expr = data$expr,
                                        p = 0.05, 
                                        change = c("Up","Down","Not")
                                       ){
+
     # colors
     red <- "\033[31m"
     green <- "\033[32m"
@@ -99,6 +100,9 @@ High_Throughtput_Count_DEG <- function(expr = data$expr,
     magenta <- "\033[35m"
     cyan <- "\033[36m"
     reset <- "\033[0m"
+
+    # 设置分组顺序
+    group_order <-  group_order_set(vector = group_order,group_levels = NULL) %>% rev()
     
     # 高通量数据差异分析
     if(!dir.exists(DEG_output_dir)){dir.create(DEG_output_dir,recursive = T)}

@@ -88,34 +88,37 @@ Array_DEGs  <- function(expr = data$expr,
                         top_gene = 10,
                         change = c("Up","Down","Not")){
 
-        # colors
-        red <- "\033[31m"
-        green <- "\033[32m"
-        yellow <- "\033[33m"
-        blue <- "\033[34m"
-        magenta <- "\033[35m"
-        cyan <- "\033[36m"
-        reset <- "\033[0m"
-        
-        # 芯片数据差异分析
-        if(!dir.exists(output_dir)){dir.create(output_dir,recursive = T)}
-        
-        if(p_value == "p.adj"){
-            pvalue <- "p.adj"
-        }else{
-            pvalue <- "p.value"
-        }
+    # colors
+    red <- "\033[31m"
+    green <- "\033[32m"
+    yellow <- "\033[33m"
+    blue <- "\033[34m"
+    magenta <- "\033[35m"
+    cyan <- "\033[36m"
+    reset <- "\033[0m"
     
-        if( !("data.frame" %in%  class(expr))){
-            expr <- as.data.frame(expr,check.names = FALSE)
-        }
+    # 设置分组顺序
+    group_order <-  group_order_set(vector = group_order,group_levels = NULL) %>% rev()
+    
+    # 芯片数据差异分析
+    if(!dir.exists(output_dir)){dir.create(output_dir,recursive = T)}
+    
+    if(p_value == "p.adj"){
+        pvalue <- "p.adj"
+    }else{
+        pvalue <- "p.value"
+    }
+    
+    if( !("data.frame" %in%  class(expr))){
+        expr <- as.data.frame(expr,check.names = FALSE)
+    }
         
-      # 检查表达值 
-      if( min(expr) >= 0 & max(expr) >= 10000 ){
+    # 检查表达值 
+    if( min(expr) >= 0 & max(expr) >= 10000 ){
         expr <- log2(expr + 1)
-      }else if( min(expr) >= 0 & all(sapply(expr, function(x) quantile(x, 0.95)) < 25) ){
+    }else if( min(expr) >= 0 & all(sapply(expr, function(x) quantile(x, 0.95)) < 25) ){
         expr <- expr
-      }else{
+    }else{
         cat("\n",red,"Please verify The Expression Data!\n\nThe Expression value range: ",reset,"\n")
         cat(paste0("\t",range(expr)))
         flush.console()
@@ -123,81 +126,81 @@ Array_DEGs  <- function(expr = data$expr,
         if(use_verify != "yes"){
            stop()
         } 
-        
-      }
     
-      # 过滤低表达基因：保留在至少 30% 样本中表达量 >5 的基因
-       #expr <- expr[rowSums(expr > 5) >= floor(ncol(expr) * 0.3), ]   
-                                            
-      # 检查condition格式
-      group_col_name <- colnames(condition)[grepl("^group$|^groups$",tolower(colnames(condition)))]
-      sample_col_name <- colnames(condition)[grepl("^sample$|^samples$",tolower(colnames(condition)))]                                      
-      if(length(group_col_name) == 1){
+    }
+    
+    # 过滤低表达基因：保留在至少 30% 样本中表达量 >5 的基因
+    #expr <- expr[rowSums(expr > 5) >= floor(ncol(expr) * 0.3), ]   
+                                        
+    # 检查condition格式
+    group_col_name <- colnames(condition)[grepl("^group$|^groups$",tolower(colnames(condition)))]
+    sample_col_name <- colnames(condition)[grepl("^sample$|^samples$",tolower(colnames(condition)))]                                      
+    if(length(group_col_name) == 1){
         condition <- condition %>% rename("Group" = !!sym(group_col_name))  # 修改列名为 Group
-      }else{
+    }else{
         cat("\n","\033[33m","Please set the column name 'condition' to 'group/groups (case-insensitive)', and there should be only one column name that matches this criterion.","\033[0m","\n")
         print(head(condition))
         stop()    
-      }
-      if(length(sample_col_name) == 1){
+    }
+    if(length(sample_col_name) == 1){
         condition <- condition %>% rename("sample" = !!sym(sample_col_name))  # 修改列名为 sample
-      }else if(length(sample_col_name) == 0){
+    }else if(length(sample_col_name) == 0){
         if( rownames(condition) %in% colnames(expr) %>% any() ){
-          condition <- condition
+            condition <- condition
         }else{
-          cat("\n","\033[33m","Sample information not found.","\033[0m","\n")
-          print(head(condition))
-          stop()
+            cat("\n","\033[33m","Sample information not found.","\033[0m","\n")
+            print(head(condition))
+            stop()
         }
-      }else{
+    }else{
         cat("\n","\033[33m","Please set the column name 'condition' to 'sample/samples (case-insensitive)', and there should be only one column name that matches this criterion.","\033[0m","\n")
         print(head(condition))
         stop() 
-      }
-      if(ncol(condition) != 1){
+    }
+    if(ncol(condition) != 1){
         # 将sample列放置到行名
         condition <- condition %>% select(c("sample","Group"))
         rownames(condition) <- condition$sample
         condition$sample <- NULL
-      }
-      
-      # 根据condition和expr筛选共同样本
-      sample_intersect <- intersect(colnames(expr),rownames(condition))
-      expr <- expr %>% dplyr::select(all_of(sample_intersect))
-      condition <- condition %>% filter(rownames(condition) %in% sample_intersect)
-                                            
-      # 按照指定的分组顺序排序分组信息样本和表达数据样本
-      condition <- condition %>% arrange(Group)
-      expr <- expr %>% dplyr::select(rownames(condition))
-                                            
-      # 设置比较顺序                                      
-      list <- c(condition$Group) %>% factor(., levels = group_order, ordered = F)
-      cat("\n","\033[33m","The group level: ","\033[0m","\n")
-      print(list)
-      
-      list <- model.matrix(~factor(list)+0)  #把Group设置成一个model matrix
-      colnames(list) <- group_order
-      
-      # 差异分析
-      df.fit <- lmFit(expr, list)  ## 数据与list进行匹配
-      df.matrix <- makeContrasts(contrasts = paste0(group_order[1], "-", group_order[2]), levels = list)
-      fit <- contrasts.fit(df.fit, df.matrix)
-      fit <- eBayes(fit)
-      Res <- topTable(fit,n = Inf, adjust = "fdr") %>% na.omit() ##所有的差异结果
-      Res <- Res %>% dplyr::rename( "p.value" = "P.Value" , 'p.adj' = 'adj.P.Val')
-      
-      # 标签
-      Res$sig <- ifelse(Res[[pvalue]] < p & Res$logFC >  logFC,  change[1],  # up
-                        ifelse(Res[[pvalue]] < p & Res$logFC < -logFC, 
-                               change[2], # down
-                               change[3]  # Not
-                              )
-                       )
-      cat("\n","\033[33m","Difference conditions: logFC >",logFC,"&",pvalue,"< ",p,"\033[0m")
-      cat("\n","\033[33m","Number of differential genes：","\033[0m","\n")
-      print(table(Res$sig))
-      flush.console()  # 强制刷新控制台输出
-      
-      write.csv(Res,file.path(output_dir,"01_limma_Res.csv"))
-      return(Res)
+    }
+    
+    # 根据condition和expr筛选共同样本
+    sample_intersect <- intersect(colnames(expr),rownames(condition))
+    expr <- expr %>% dplyr::select(all_of(sample_intersect))
+    condition <- condition %>% filter(rownames(condition) %in% sample_intersect)
+                                        
+    # 按照指定的分组顺序排序分组信息样本和表达数据样本
+    condition <- condition %>% arrange(Group)
+    expr <- expr %>% dplyr::select(rownames(condition))
+                                        
+    # 设置比较顺序                                      
+    list <- c(condition$Group) %>% factor(., levels = group_order, ordered = F)
+    cat("\n","\033[33m","The group level: ","\033[0m","\n")
+    print(list)
+    
+    list <- model.matrix(~factor(list)+0)  #把Group设置成一个model matrix
+    colnames(list) <- group_order
+    
+    # 差异分析
+    df.fit <- lmFit(expr, list)  ## 数据与list进行匹配
+    df.matrix <- makeContrasts(contrasts = paste0(group_order[1], "-", group_order[2]), levels = list)
+    fit <- contrasts.fit(df.fit, df.matrix)
+    fit <- eBayes(fit)
+    Res <- topTable(fit,n = Inf, adjust = "fdr") %>% na.omit() ##所有的差异结果
+    Res <- Res %>% dplyr::rename( "p.value" = "P.Value" , 'p.adj' = 'adj.P.Val')
+    
+    # 标签
+    Res$sig <- ifelse(Res[[pvalue]] < p & Res$logFC >  logFC,  change[1],  # up
+                    ifelse(Res[[pvalue]] < p & Res$logFC < -logFC, 
+                           change[2], # down
+                           change[3]  # Not
+                          )
+                   )
+    cat("\n","\033[33m","Difference conditions: logFC >",logFC,"&",pvalue,"< ",p,"\033[0m")
+    cat("\n","\033[33m","Number of differential genes：","\033[0m","\n")
+    print(table(Res$sig))
+    flush.console()  # 强制刷新控制台输出
+    
+    write.csv(Res,file.path(output_dir,"01_limma_Res.csv"))
+    return(Res)
 }

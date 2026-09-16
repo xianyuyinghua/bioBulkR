@@ -107,7 +107,10 @@ Volcano_Heatmap_plot <- function(Res = Res,
     magenta <- "\033[35m"
     cyan <- "\033[36m"
     reset <- "\033[0m"
-  
+    
+    # 设置分组顺序
+    group_order <-  group_order_set(vector = group_order,group_levels = NULL) %>% rev()
+    
     # 差异判断 
     if(p_value == "p.adj"){
         pvalue <- "p.adj"
@@ -249,7 +252,7 @@ Volcano_Heatmap_plot <- function(Res = Res,
       mat[mat < heatmap_scale_range[1]] <- heatmap_scale_range[1]
       mat[mat > heatmap_scale_range[2]] <- heatmap_scale_range[2]
       
-      condition$Group <- factor(condition$Group, levels = group_order)
+      condition$Group <- factor(condition$Group, levels = rev(group_order))
       condition <- condition[order(condition$Group), ]
       annotation_col <- data.frame(row.names = condition$sample, Group = condition$Group)
       annotation_row <- data.frame(row.names = rownames(data_repel), sig = data_repel$sig)
