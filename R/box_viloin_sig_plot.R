@@ -370,7 +370,7 @@ box_viloin_sig_plot <- function(data_long, type_col = "Gene",group_col = "Group"
                    axis.line = element_line(linewidth = 0.7),
                    legend.title = element_text(face = "bold"),
                    plot.title = element_text(hjust = 0.5,vjust = 1,face = "bold", size = 18),
-                   plot.margin = ggplot2::margin(t = 5,r = 5,b = 5,l = 5,unit = "mm")
+                   plot.margin = ggplot2::margin(t = 10,r = 5,b = 5,l = 5,unit = "mm")
                   )
     if(is.na(type_col)){
         p1 <- p1 + theme(axis.ticks.x = element_blank())
