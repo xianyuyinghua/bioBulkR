@@ -197,39 +197,47 @@ box_viloin_sig_plot <- function(data_long, type_col = "Gene",group_col = "Group"
                                                       detailed = FALSE
                                                      )
             if(length(deleted_types) != 0){
-                add_stat_test <- data.frame("Type" = rep(deleted_types,length(my_comparisons)),
-                                            ".y." = rep("Value",length(my_comparisons)),
-                                            "group1" = sapply(my_comparisons, `[`, 1),
-                                            "group2" = sapply(my_comparisons, `[`, 2),
-                                            "n1" = rep(unique(stat.test$n1),length(my_comparisons)),
-                                            "n2" = rep(unique(stat.test$n2),length(my_comparisons)),
-                                            "statistic" = df_mean_deleted$mean_value,
-                                            "p" = rep(NA,length(my_comparisons)),
-                                            "p.adj" = rep(NA,length(my_comparisons)),
-                                            "p.adj.signif" = rep("ns",length(my_comparisons))
-                                           )
-                stat.test <- rbind(stat.test,add_stat_test)
+                add_stat_test <- tidyr::expand_grid(Type = deleted_types,comparison_id = seq_along(my_comparisons)) %>%
+                    dplyr::mutate(.y. = "Value",
+                                  group1 = sapply(comparison_id, function(i) my_comparisons[[i]][1]),
+                                                  group2 = sapply(comparison_id, function(i) my_comparisons[[i]][2])) %>%
+                    dplyr::select(-comparison_id)
+            
+                group_n <- data_long %>% dplyr::count(Type, Group, name = "n")
+            
+                add_stat_test <- add_stat_test %>%
+                    dplyr::left_join(group_n %>% dplyr::rename(group1 = Group, n1 = n),by = c("Type", "group1")) %>%
+                    dplyr::left_join(group_n %>% dplyr::rename(group2 = Group, n2 = n),by = c("Type", "group2")) %>%
+                    dplyr::left_join(df_mean_deleted,by = "Type") %>%
+                    dplyr::mutate(statistic = mean_value,p = NA_real_,p.adj = NA_real_,p.adj.signif = "ns") %>%
+                    dplyr::select(Type, .y., group1, group2,n1, n2, statistic,p, p.adj, p.adj.signif)
+            
+                stat.test <- dplyr::bind_rows(stat.test, add_stat_test)
             }
         }else if(grepl("^t$",test_method)){
             stat.test <- filtered_data %>%
                         group_by(Type) %>%
                         rstatix::pairwise_t_test(Value ~ Group,
                                                  comparisons = my_comparisons,
-                                                 p.adjust.method = "bonferroni")
+                                                 p.adjust.method = "bonferroni"
+                                                )
             if(length(deleted_types) != 0){
-                add_stat_test <- data.frame("Type" = rep(deleted_types,length(my_comparisons)),
-                                ".y." = rep("Value",length(my_comparisons)),
-                                "group1" = sapply(my_comparisons, `[`, 1),
-                                "group2" = sapply(my_comparisons, `[`, 2),
-                                "n1" = rep(unique(stat.test$n1),length(my_comparisons)),
-                                "n2" = rep(unique(stat.test$n2),length(my_comparisons)),
-                                "p" = rep(NA,length(my_comparisons)),
-                                "p.signif" = rep("ns",length(my_comparisons)),       
-                                "p.adj" = rep(NA,length(my_comparisons)),
-                                "p.adj.signif" = rep("ns",length(my_comparisons))
-                               )
-                stat.test <- rbind(stat.test,add_stat_test)
+                add_stat_test <- tidyr::expand_grid(Type = deleted_types,comparison_id = seq_along(my_comparisons)) %>%
+                    dplyr::mutate(.y. = "Value",group1 = sapply(comparison_id, function(i) my_comparisons[[i]][1]),
+                                                                group2 = sapply(comparison_id, function(i) my_comparisons[[i]][2])) %>%
+                    dplyr::select(-comparison_id)
+            
+                group_n <- data_long %>% dplyr::count(Type, Group, name = "n")
+            
+                add_stat_test <- add_stat_test %>% 
+                    dplyr::left_join(group_n %>% dplyr::rename(group1 = Group, n1 = n),by = c("Type", "group1")) %>%
+                    dplyr::left_join(group_n %>% dplyr::rename(group2 = Group, n2 = n),by = c("Type", "group2")) %>%
+                    dplyr::mutate(p = NA_real_,p.signif = "ns",p.adj = NA_real_,p.adj.signif = "ns") %>%
+                    dplyr::select(Type, .y., group1, group2,n1, n2,p, p.signif,p.adj, p.adj.signif)
+            
+                stat.test <- dplyr::bind_rows(stat.test, add_stat_test)
             }
+            
         }else{
             stop("method no matched!")
         }
