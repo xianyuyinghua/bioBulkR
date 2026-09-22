@@ -166,11 +166,10 @@ box_viloin_sig_plot <- function(data_long, type_col = "Gene",group_col = "Group"
     filtered_types <- setdiff(unique(data_long$Type),deleted_types)
     
     # 检查数据中是否任意2个分组的值都为0
-    zero_status <- data_long %>%
-      dplyr::group_by(Type, Group) %>%
-      dplyr::summarise(all_same = n_distinct(Value) == 1, .groups = "drop") %>%
-      dplyr::group_by(Type) %>%
-      dplyr::summarise(any_two_groups_same = any(combn(all_same, 2, FUN = function(x) all(x))), .groups = "drop")
+    zero_status <- data_long %>% dplyr::group_by(Type, Group) %>%
+        dplyr::summarise(all_same = dplyr::n_distinct(Value) == 1,.groups = "drop") %>%
+        dplyr::group_by(Type) %>%
+        dplyr::summarise(any_two_groups_same = sum(all_same, na.rm = TRUE) >= 2,.groups = "drop")
                           
     deleted_types_special <- setdiff(zero_status %>% dplyr::filter(any_two_groups_same) %>% dplyr::pull(Type),deleted_types)
     if( length(deleted_types_special) != 0 ){                                            
@@ -187,83 +186,103 @@ box_viloin_sig_plot <- function(data_long, type_col = "Gene",group_col = "Group"
       dplyr::summarise(mean_value = mean(Value, na.rm = TRUE), .groups = "drop")
                                                 
     # sig stat 
-    if( grepl("^wilcox",test_method) ){
-        stat.test <- filtered_data %>%
-                    group_by(Type) %>%
-                    rstatix::pairwise_wilcox_test(Value ~ Group,
-                                                  comparisons = my_comparisons,
-                                                  p.adjust.method = "bonferroni",
-                                                  detailed = FALSE
-                                                 )
-        if(length(deleted_types) != 0){
-            add_stat_test <- data.frame("Type" = rep(deleted_types,length(my_comparisons)),
-                                        ".y." = rep("Value",length(my_comparisons)),
-                                        "group1" = sapply(my_comparisons, `[`, 1),
-                                        "group2" = sapply(my_comparisons, `[`, 2),
-                                        "n1" = rep(unique(stat.test$n1),length(my_comparisons)),
-                                        "n2" = rep(unique(stat.test$n2),length(my_comparisons)),
-                                        "statistic" = df_mean_deleted$mean_value,
-                                        "p" = rep(NA,length(my_comparisons)),
-                                        "p.adj" = rep(NA,length(my_comparisons)),
-                                        "p.adj.signif" = rep("ns",length(my_comparisons))
-                                       )
-            stat.test <- rbind(stat.test,add_stat_test)
+    if(length(group_present) >= 2){
+        # 有多个比较组
+        if( grepl("^wilcox",test_method) ){
+            stat.test <- filtered_data %>%
+                        group_by(Type) %>%
+                        rstatix::pairwise_wilcox_test(Value ~ Group,
+                                                      comparisons = my_comparisons,
+                                                      p.adjust.method = "bonferroni",
+                                                      detailed = FALSE
+                                                     )
+            if(length(deleted_types) != 0){
+                add_stat_test <- data.frame("Type" = rep(deleted_types,length(my_comparisons)),
+                                            ".y." = rep("Value",length(my_comparisons)),
+                                            "group1" = sapply(my_comparisons, `[`, 1),
+                                            "group2" = sapply(my_comparisons, `[`, 2),
+                                            "n1" = rep(unique(stat.test$n1),length(my_comparisons)),
+                                            "n2" = rep(unique(stat.test$n2),length(my_comparisons)),
+                                            "statistic" = df_mean_deleted$mean_value,
+                                            "p" = rep(NA,length(my_comparisons)),
+                                            "p.adj" = rep(NA,length(my_comparisons)),
+                                            "p.adj.signif" = rep("ns",length(my_comparisons))
+                                           )
+                stat.test <- rbind(stat.test,add_stat_test)
+            }
+        }else if(grepl("^t$",test_method)){
+            stat.test <- filtered_data %>%
+                        group_by(Type) %>%
+                        rstatix::pairwise_t_test(Value ~ Group,
+                                                 comparisons = my_comparisons,
+                                                 p.adjust.method = "bonferroni")
+            if(length(deleted_types) != 0){
+                add_stat_test <- data.frame("Type" = rep(deleted_types,length(my_comparisons)),
+                                ".y." = rep("Value",length(my_comparisons)),
+                                "group1" = sapply(my_comparisons, `[`, 1),
+                                "group2" = sapply(my_comparisons, `[`, 2),
+                                "n1" = rep(unique(stat.test$n1),length(my_comparisons)),
+                                "n2" = rep(unique(stat.test$n2),length(my_comparisons)),
+                                "p" = rep(NA,length(my_comparisons)),
+                                "p.signif" = rep("ns",length(my_comparisons)),       
+                                "p.adj" = rep(NA,length(my_comparisons)),
+                                "p.adj.signif" = rep("ns",length(my_comparisons))
+                               )
+                stat.test <- rbind(stat.test,add_stat_test)
+            }
+        }else{
+            stop("method no matched!")
         }
-    }else if(grepl("^t$",test_method)){
-        stat.test <- filtered_data %>%
-                    group_by(Type) %>%
-                    rstatix::pairwise_t_test(Value ~ Group,
-                                             comparisons = my_comparisons,
-                                             p.adjust.method = "bonferroni")
-        if(length(deleted_types) != 0){
-            add_stat_test <- data.frame("Type" = rep(deleted_types,length(my_comparisons)),
-                            ".y." = rep("Value",length(my_comparisons)),
-                            "group1" = sapply(my_comparisons, `[`, 1),
-                            "group2" = sapply(my_comparisons, `[`, 2),
-                            "n1" = rep(unique(stat.test$n1),length(my_comparisons)),
-                            "n2" = rep(unique(stat.test$n2),length(my_comparisons)),
-                            "p" = rep(NA,length(my_comparisons)),
-                            "p.signif" = rep("ns",length(my_comparisons)),       
-                            "p.adj" = rep(NA,length(my_comparisons)),
-                            "p.adj.signif" = rep("ns",length(my_comparisons))
-                           )
-            stat.test <- rbind(stat.test,add_stat_test)
-        }
+            
     }else{
-        stop("method no matched!")
+        # 只有1个组
+        stat.test <- data.frame()
+        
     }
 
-    # 添加 p.signif
-    stat.test <- stat.test %>%
-              mutate(p.signif = case_when(#p < 0.0001 ~ "****",
-                                          p < 0.001 ~ "***",
-                                          p < 0.01 ~ "**",
-                                          p < 0.05 ~ "*",
-                                          TRUE ~ "ns" 
-                                      ),
-                     p.adj.signif =case_when( p.adj.signif == "****" ~ "***",TRUE ~ p.adj.signif)
-                    )
-    
-    
-    # 添加 x y  position
-    if( length(stat.test$Type) == 1 ){
-        # 只有1类
-        x_name <- "Group"
-        stat.test$y.position = max(filtered_data$Value) * 1.1
-        stat.test$xmin = 1
-        stat.test$xmax = 2
 
-        stat.test  <- as.data.frame(stat.test)
-        stat.test$groups <- paste0(stat.test$group2,"_vs_",stat.test$group1)
-    }else{
-        # 有多类
-        x_name <- "Type"
-        stat.test <- stat.test %>% rstatix::add_xy_position(x = "Type") 
-
-        stat.test  <- as.data.frame(stat.test)
-        stat.test$groups <- sapply(stat.test$groups, function(x) paste(x, collapse = "_vs_"))
+    # ============================================================
+    # 添加显著性以及显著性坐标
+    # ============================================================
+    
+    # x轴变量不应该依赖 stat.test 是否为空
+    if(is.na(type_col)){x_name <- "Group"}else{x_name <- "Type"}
+    
+    # 只有确实存在统计结果时，才继续处理显著性
+    if(nrow(stat.test) > 0){
+        stat.test <- stat.test %>%
+            dplyr::mutate(p.signif = dplyr::case_when(is.na(p)   ~ "ns",
+                                                      p < 0.001  ~ "***",
+                                                      p < 0.01   ~ "**",
+                                                      p < 0.05   ~ "*",
+                                                      TRUE       ~ "ns"
+                                                     ),
+                          p.adj.signif = dplyr::case_when(is.na(p.adj)  ~ "ns",
+                                                          p.adj < 0.001 ~ "***",
+                                                          p.adj < 0.01  ~ "**",
+                                                          p.adj < 0.05  ~ "*",
+                                                          TRUE          ~ "ns"
+                                                         )
+                         )
+    
+        # 添加显著性位置
+        if(x_name == "Group"){
+            stat.test$y.position <- max(filtered_data$Value, na.rm = TRUE) * 1.1
+            stat.test$xmin <- 1
+            stat.test$xmax <- 2
+    
+            stat.test <- as.data.frame(stat.test)
+    
+            stat.test$groups <- paste0(stat.test$group2,"_vs_",stat.test$group1)
+    
+        }else{
+            stat.test <- stat.test %>% rstatix::add_xy_position(x = "Type")
+    
+            stat.test <- as.data.frame(stat.test)
+    
+            stat.test$groups <- sapply(stat.test$groups,function(x) paste(x, collapse = "_vs_"))
+        }
     }
-    
                         
     # plot
     if(add_point){outlier_shape = NA}else{outlier_shape = 19}
@@ -387,17 +406,27 @@ box_viloin_sig_plot <- function(data_long, type_col = "Gene",group_col = "Group"
 
     label_show <- paste0(lable_pre,lable_suffix)
         
-    p1 + ggpubr::stat_pvalue_manual(
-      stat.test,
-      label = label_show,
-      step.increase = step_increase,
-      hide.ns = hide_ns,
-      tip.length = 0,  # 调整括号末端长度
-      vjust = sig_bracket_vjust, # 调整 * 线y位置
-      bracket.size = bracket_size,
-      bracket.nudge.y = bracket_y, # 调整 线y位置
-      size = 5
-    ) -> p1
+    if(nrow(stat.test) > 0){
+    
+        stat.test_plot <- stat.test %>% dplyr::filter(!is.na(y.position),
+                                                      is.finite(y.position),
+                                                      !is.na(group1),
+                                                      !is.na(group2)
+                                                     )
+    
+        if(nrow(stat.test_plot) > 0){
+            p1 <- p1 + ggpubr::stat_pvalue_manual(stat.test_plot,
+                                                  label = label_show,
+                                                  step.increase = step_increase,
+                                                  hide.ns = hide_ns,
+                                                  tip.length = 0,
+                                                  vjust = sig_bracket_vjust,
+                                                  bracket.size = bracket_size,
+                                                  bracket.nudge.y = bracket_y,
+                                                  size = 5
+                                                 )
+        }
+    } 
         
     return(list(plot = p1, stat = stat.test))
 }
