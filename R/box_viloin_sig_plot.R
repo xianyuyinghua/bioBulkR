@@ -111,6 +111,9 @@ box_viloin_sig_plot <- function(data_long, type_col = "Gene",group_col = "Group"
                   )
         }
         data_long <- data_long %>%  dplyr::rename("Type" = type_col,"Group" = group_col,"Value"  = value_col)
+
+        data_long <- data_long %>% dplyr::filter(!is.na(Group),!is.na(Value))
+        data_long$Group <- droplevels(data_long$Group)
         
         # factor
         if(any(is.na(type_level))){
@@ -145,8 +148,15 @@ box_viloin_sig_plot <- function(data_long, type_col = "Gene",group_col = "Group"
     }
         
     # compare group
-    my_comparisons <- utils::combn(levels(data_long$Group), 2, simplify = FALSE)
-
+    group_present <- levels(data_long$Group)
+    n_group <- length(group_present)
+    
+    if(n_group >= 2){
+        my_comparisons <- utils::combn(group_present,2,simplify = FALSE)
+    }else{
+        my_comparisons <- list()
+    }
+    
     deleted_types <- data_long %>%
       dplyr::group_by(Type) %>%
       dplyr::summarise(all_zero = all(Value == 0), .groups = "drop") %>%
@@ -388,5 +398,6 @@ box_viloin_sig_plot <- function(data_long, type_col = "Gene",group_col = "Group"
       bracket.nudge.y = bracket_y, # 调整 线y位置
       size = 5
     ) -> p1
+        
     return(list(plot = p1, stat = stat.test))
 }
