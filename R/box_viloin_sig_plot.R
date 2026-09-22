@@ -225,16 +225,13 @@ box_viloin_sig_plot <- function(data_long, type_col = "Gene",group_col = "Group"
 
     # 添加 p.signif
     stat.test <- stat.test %>%
-              mutate(p.signif = case_when( 
-                  #p < 0.0001 ~ "****",
-                  p < 0.001 ~ "***",
-                  p < 0.01 ~ "**",
-                  p < 0.05 ~ "*",
-                  TRUE ~ "ns" 
-              ),
-                     p.adj.signif =case_when( p.adj.signif == "****" ~ "***",
-                                             TRUE ~ p.adj.signif
-                                            )
+              mutate(p.signif = case_when(#p < 0.0001 ~ "****",
+                                          p < 0.001 ~ "***",
+                                          p < 0.01 ~ "**",
+                                          p < 0.05 ~ "*",
+                                          TRUE ~ "ns" 
+                                      ),
+                     p.adj.signif =case_when( p.adj.signif == "****" ~ "***",TRUE ~ p.adj.signif)
                     )
     
     
@@ -257,29 +254,42 @@ box_viloin_sig_plot <- function(data_long, type_col = "Gene",group_col = "Group"
         stat.test$groups <- sapply(stat.test$groups, function(x) paste(x, collapse = "_vs_"))
     }
     
-
-                               
+                        
     # plot
     if(add_point){outlier_shape = NA}else{outlier_shape = 19}
-    # 根据 plot_type 设置绘图函数
-    plot_func <- if (grepl("^box", plot_type)) {
-      ggpubr::ggboxplot
-    } else if (grepl("^vi", plot_type)) {
-      ggpubr::ggviolin
-    } else {
-      stop("不支持的 plot_type")
+                                   
+    if(grepl("^box", plot_type)){
+        # Boxplot
+        p1 <- ggpubr::ggboxplot(data_long,
+                                x = x_name,
+                                y = "Value",
+                                width = 0.6,
+                                color = "Group",
+                                palette = "jco",
+                                bxp.errorbar = FALSE,
+                                bxp.errorbar.width = 0.5,
+                                size = 0.5,
+                                outlier.shape = outlier_shape,
+                                legend = "right"
+                            ) +
+            labs(y = axis_y_title,x = axis_x_title,color = legend_title)
+        
+    }else if(grepl("^vi", plot_type)){
+        # Violin
+        if(x_name == "Group"){
+            p1 <- ggplot(data_long,aes(x = Group,y = Value,fill = Group,color = Group)) +
+            geom_violin(width = 0.9,scale = "width",trim = TRUE,adjust = 2,linewidth = 0.5)
+        }else{
+            p1 <- ggplot(data_long,aes(x = Type,y = Value,fill = Group,color = Group,group = interaction(Type, Group))) +
+            geom_violin(position = position_dodge(width = 0.8),width = 0.9,scale = "width",trim = TRUE,adjust = 2,linewidth = 0.5)
+        }
+        p1 <- p1 + labs(y = axis_y_title,x = axis_x_title,fill = legend_title,color = legend_title)
+        
+    }else{
+        stop("不支持的 plot_type")
     }
-    
-    # 调用绘图函数，并统一设置
-    p1 <- plot_func(data_long, x = x_name, y = "Value", width = 0.6,
-                    color = "Group",
-                    palette = "jco",
-                    bxp.errorbar = FALSE,
-                    bxp.errorbar.width = 0.5,
-                    size = 0.5,
-                    outlier.shape = outlier_shape,
-                    legend = "right"  ) +
-            labs(y = axis_y_title, x = axis_x_title,color = legend_title)
+                                                
+      
     # 是否加散点                               
     if (add_point) {
         if (x_name == "Group") {
@@ -320,24 +330,38 @@ box_viloin_sig_plot <- function(data_long, type_col = "Gene",group_col = "Group"
         hjust_value = 1 
     }
         
-  p1 <- p1 + labs(title = title_name)  
-  p1 <- p1 + theme(axis.text.x = element_text(angle = x_text_angle, vjust = vjust_value, hjust = hjust_value,face = "bold",size = 17),
+  p1 <- p1 + labs(title = title_name)
+  p1 <- p1 + theme_classic(base_size = 17) 
+  p1 <- p1 + theme(panel.background = element_blank(),
+                   panel.grid = element_blank(),
+                   plot.background = element_blank(),
+                   axis.text.x = element_text(angle = x_text_angle, vjust = vjust_value, hjust = hjust_value,face = "bold",size = 17),
                    axis.title = element_text(face = "bold", size = 20),
-                   axis.text.y = element_text(size = 17),
-                   legend.title = element_text(face = "bold", size = 17),
-                   legend.text = element_text(size = 17),
+                   axis.ticks = element_line(linewidth = 0.7),
+                   axis.line = element_line(linewidth = 0.7),
+                   legend.title = element_text(face = "bold"),
                    plot.title = element_text(hjust = 0.5,vjust = 1,face = "bold", size = 18),
                    plot.margin = ggplot2::margin(t = 5,r = 5,b = 5,l = 5,unit = "mm")
                   )
     if(is.na(type_col)){
         p1 <- p1 + theme(axis.ticks.x = element_blank())
     }
-                                                
-    if(length(group_color) > 1){
-        # 有指定颜色
-        p1 <- p1 +  scale_color_manual(values = group_color)
-    }
 
+    # 颜色                               
+    if(grepl("^vi", plot_type)){
+        # violn
+        if(is.null(group_color) || any(is.na(group_color))){
+            group_color <- basicR::get_colors(number = 10.1,package = "ggsci",name = "jco")
+        }
+        p1 <- p1 + scale_color_manual(values = group_color,name = legend_title)
+        p1 <- p1 + scale_fill_manual(values = group_color,name = legend_title)
+    }else if(grepl("^box", plot_type)){
+        # box 
+        if(!is.null(group_color) && !any(is.na(group_color))){
+            p1 <- p1 + scale_color_manual(values = group_color,name = legend_title)
+        }
+    }  
+                                   
     # 显示显著性
     if(grepl("sig",diff_show_type)){
         lable_suffix <- ".signif"
