@@ -407,7 +407,6 @@ box_viloin_sig_plot <- function(data_long, type_col = "Gene",group_col = "Group"
     label_show <- paste0(lable_pre,lable_suffix)
         
     if(nrow(stat.test) > 0){
-    
         stat.test_plot <- stat.test %>% dplyr::filter(!is.na(y.position),
                                                       is.finite(y.position),
                                                       !is.na(group1),
@@ -415,16 +414,40 @@ box_viloin_sig_plot <- function(data_long, type_col = "Gene",group_col = "Group"
                                                      )
     
         if(nrow(stat.test_plot) > 0){
-            p1 <- p1 + ggpubr::stat_pvalue_manual(stat.test_plot,
-                                                  label = label_show,
-                                                  step.increase = step_increase,
-                                                  hide.ns = hide_ns,
-                                                  tip.length = 0,
-                                                  vjust = sig_bracket_vjust,
-                                                  bracket.size = bracket_size,
-                                                  bracket.nudge.y = bracket_y,
-                                                  size = 5
-                                                 )
+            stat_sig <- stat.test_plot %>% dplyr::filter(.data[[label_show]] != "ns")
+            stat_ns <- stat.test_plot %>% dplyr::filter(.data[[label_show]] == "ns")
+            
+            if(nrow(stat_sig) > 0){
+                # **
+                p1 <- p1 +
+                    ggpubr::stat_pvalue_manual(
+                        stat_sig,
+                        label = label_show,
+                        step.increase = step_increase,
+                        hide.ns = FALSE,
+                        tip.length = 0,
+                        vjust = sig_bracket_vjust*3.2,
+                        bracket.size = bracket_size,
+                        bracket.nudge.y = bracket_y,
+                        size = 6.5
+                    )
+            }
+            
+            if(nrow(stat_ns) > 0){
+                # ns
+                p1 <- p1 +
+                    ggpubr::stat_pvalue_manual(
+                        stat_ns,
+                        label = label_show,
+                        step.increase = step_increase,
+                        hide.ns = FALSE,
+                        tip.length = 0,
+                        vjust = sig_bracket_vjust,
+                        bracket.size = bracket_size,
+                        bracket.nudge.y = bracket_y,
+                        size = 4.5
+                    )
+            }
         }
     } 
         
