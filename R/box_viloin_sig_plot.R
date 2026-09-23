@@ -81,7 +81,7 @@ box_viloin_sig_plot <- function(data_long, type_col = "Gene",group_col = "Group"
                                 add_point = FALSE,point_size = 1.8,point_alpha = 0.7,point_width = 0.15,
                                 group_color = basicR::get_colors(package = "ggsci",name = "jco",number = 5.1),
                                 plot_type = "box",diff_show_type = "signif",diff_show_name = "p.value",
-                                sig_bracket_vjust = 0.7,step_increase = 0,hide_ns = TRUE,bracket_size = 0.8,bracket_y = 0,
+                                sig_bracket_vjust = 0.7,within_type_step = 0.1,step_increase = 0,hide_ns = TRUE,bracket_size = 0.8,bracket_y = 0,
                                 axis_y_title = "Expression", axis_x_title = "Gene",legend_title = "Group",
                                 title_name = NULL
                                ){
@@ -91,7 +91,8 @@ box_viloin_sig_plot <- function(data_long, type_col = "Gene",group_col = "Group"
     ###############################################################################################################################
     ################################################ Function ##########################################
     ###############################################################################################################################
-    run_type <- function(tp, dat, comps, test_method = "wilcox") {
+    run_type <- function(tp, dat, comps, test_method = "wilcox", y_step = 0.1) {
+    
         # 秩和检验、T检验
         type_levels  <- levels(dat$Type)
         group_levels <- levels(dat$Group)
@@ -112,15 +113,18 @@ box_viloin_sig_plot <- function(data_long, type_col = "Gene",group_col = "Group"
     
         # 保持 my_comparisons 原始顺序
         cmp <- Filter(function(p) {
+    
             if(!all(p %in% names(nb))) return(FALSE)
+    
             n1 <- nb[[p[1]]]
             n2 <- nb[[p[2]]]
-            # t-test 至少每组2个观测值
+    
             if(grepl("^t$", test_method)){
                 n1 >= 2 && n2 >= 2
             }else{
                 n1 >= 1 && n2 >= 1
             }
+    
         }, comps)
     
         if(length(cmp) == 0) return(NULL)
@@ -139,6 +143,7 @@ box_viloin_sig_plot <- function(data_long, type_col = "Gene",group_col = "Group"
             )
     
         }else if(grepl("^t$", test_method)){
+    
             stat_now <- rstatix::pairwise_t_test(
                 z,
                 Value ~ Group,
@@ -160,9 +165,14 @@ box_viloin_sig_plot <- function(data_long, type_col = "Gene",group_col = "Group"
                 formula = Value ~ Group
             )
     
+        # ------------------------------------------------------------
+        # 扩大同一 Type 内不同比较之间的垂直间距
+        # 第一个不动，后面依次增加 y_step
+        # ------------------------------------------------------------
+        stat_now$y.position <- stat_now$y.position + (seq_len(nrow(stat_now)) - 1) * y_step
+    
         # ============================================================
         # 手动计算 xmin / xmax
-        # 与 position_dodge(width = 0.8) 对应
         # ============================================================
         x0 <- match(tp, type_levels)
         ng <- length(groups_now)
@@ -309,7 +319,8 @@ box_viloin_sig_plot <- function(data_long, type_col = "Gene",group_col = "Group"
                                         run_type,
                                         dat = filtered_data,
                                         comps = my_comparisons,
-                                        test_method = "wilcox"
+                                        test_method = "wilcox",
+                                        y_step = within_type_step
                                         )
             
             if(length(deleted_types) != 0){
@@ -335,7 +346,8 @@ box_viloin_sig_plot <- function(data_long, type_col = "Gene",group_col = "Group"
                                         run_type,
                                         dat = filtered_data,
                                         comps = my_comparisons,
-                                        test_method = "t"
+                                        test_method = "t",
+                                        y_step = within_type_step
                                         )
             
             if(length(deleted_types) != 0){
