@@ -188,14 +188,15 @@ box_viloin_sig_plot <- function(data_long, type_col = "Gene",group_col = "Group"
     # sig stat 
     if(length(group_present) >= 2){
         # 有多个比较组
+        type_levels <- levels(filtered_data$Type)
         if( grepl("^wilcox",test_method) ){
-            stat.test <- filtered_data %>%
-                        group_by(Type) %>%
-                        rstatix::pairwise_wilcox_test(Value ~ Group,
-                                                      comparisons = my_comparisons,
-                                                      p.adjust.method = "bonferroni",
-                                                      detailed = FALSE
-                                                     )
+            stat.test <- purrr::map_dfr(type_levels,
+                                        run_type,
+                                        dat = filtered_data,
+                                        comps = my_comparisons,
+                                        test_method = "wilcox"
+                                        )
+            
             if(length(deleted_types) != 0){
                 add_stat_test <- tidyr::expand_grid(Type = deleted_types,comparison_id = seq_along(my_comparisons)) %>%
                     dplyr::mutate(.y. = "Value",
@@ -215,12 +216,13 @@ box_viloin_sig_plot <- function(data_long, type_col = "Gene",group_col = "Group"
                 stat.test <- dplyr::bind_rows(stat.test, add_stat_test)
             }
         }else if(grepl("^t$",test_method)){
-            stat.test <- filtered_data %>%
-                        group_by(Type) %>%
-                        rstatix::pairwise_t_test(Value ~ Group,
-                                                 comparisons = my_comparisons,
-                                                 p.adjust.method = "bonferroni"
-                                                )
+            stat.test <- purrr::map_dfr(type_levels,
+                                        run_type,
+                                        dat = filtered_data,
+                                        comps = my_comparisons,
+                                        test_method = "t"
+                                        )
+            
             if(length(deleted_types) != 0){
                 add_stat_test <- tidyr::expand_grid(Type = deleted_types,comparison_id = seq_along(my_comparisons)) %>%
                     dplyr::mutate(.y. = "Value",group1 = sapply(comparison_id, function(i) my_comparisons[[i]][1]),
@@ -247,7 +249,7 @@ box_viloin_sig_plot <- function(data_long, type_col = "Gene",group_col = "Group"
         stat.test <- data.frame()
         
     }
-
+    
 
     # ============================================================
     # 添加显著性以及显著性坐标
@@ -284,11 +286,7 @@ box_viloin_sig_plot <- function(data_long, type_col = "Gene",group_col = "Group"
             stat.test$groups <- paste0(stat.test$group2,"_vs_",stat.test$group1)
     
         }else{
-            stat.test <- stat.test %>% rstatix::add_xy_position(x = "Type")
-    
             stat.test <- as.data.frame(stat.test)
-    
-            stat.test$groups <- sapply(stat.test$groups,function(x) paste(x, collapse = "_vs_"))
         }
     }
                         
@@ -420,7 +418,6 @@ box_viloin_sig_plot <- function(data_long, type_col = "Gene",group_col = "Group"
                                                       !is.na(group1),
                                                       !is.na(group2)
                                                      )
-    
         if(nrow(stat.test_plot) > 0){
             stat_sig <- stat.test_plot %>% dplyr::filter(.data[[label_show]] != "ns")
             stat_ns <- stat.test_plot %>% dplyr::filter(.data[[label_show]] == "ns")
