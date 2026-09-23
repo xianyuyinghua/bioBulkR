@@ -85,8 +85,123 @@ box_viloin_sig_plot <- function(data_long, type_col = "Gene",group_col = "Group"
                                 axis_y_title = "Expression", axis_x_title = "Gene",legend_title = "Group",
                                 title_name = NULL
                                ){
+    # ## 组间差异盒子图或小提琴图
     library(ggplot2)
-    ## 组间差异盒子图或小提琴图
+    
+    ###############################################################################################################################
+    ################################################ Function ##########################################
+    ###############################################################################################################################
+    run_type <- function(tp, dat, comps, test_method = "wilcox") {
+        # 秩和检验、T检验
+        type_levels  <- levels(dat$Type)
+        group_levels <- levels(dat$Group)
+    
+        z <- dat %>%
+            dplyr::filter(Type == tp, !is.na(Value)) %>%
+            dplyr::mutate(
+                Type  = factor(Type, levels = type_levels),
+                Group = droplevels(factor(Group, levels = group_levels))
+            )
+    
+        if(nrow(z) == 0) return(NULL)
+    
+        nb <- table(z$Group)
+    
+        # 当前 Type 实际存在的分组
+        groups_now <- group_levels[group_levels %in% names(nb)]
+    
+        # 保持 my_comparisons 原始顺序
+        cmp <- Filter(function(p) {
+            if(!all(p %in% names(nb))) return(FALSE)
+            n1 <- nb[[p[1]]]
+            n2 <- nb[[p[2]]]
+            # t-test 至少每组2个观测值
+            if(grepl("^t$", test_method)){
+                n1 >= 2 && n2 >= 2
+            }else{
+                n1 >= 1 && n2 >= 1
+            }
+        }, comps)
+    
+        if(length(cmp) == 0) return(NULL)
+    
+        # ============================================================
+        # 统计检验
+        # ============================================================
+        if(grepl("^wilcox", test_method)){
+    
+            stat_now <- rstatix::pairwise_wilcox_test(
+                z,
+                Value ~ Group,
+                comparisons = cmp,
+                p.adjust.method = "bonferroni",
+                detailed = FALSE
+            )
+    
+        }else if(grepl("^t$", test_method)){
+            stat_now <- rstatix::pairwise_t_test(
+                z,
+                Value ~ Group,
+                comparisons = cmp,
+                p.adjust.method = "bonferroni",
+                detailed = FALSE
+            )
+    
+        }else{
+            stop("test_method must be 'wilcox' or 't'")
+        }
+    
+        # ============================================================
+        # 计算 y.position
+        # ============================================================
+        stat_now <- stat_now %>%
+            rstatix::add_y_position(
+                data = z,
+                formula = Value ~ Group
+            )
+    
+        # ============================================================
+        # 手动计算 xmin / xmax
+        # 与 position_dodge(width = 0.8) 对应
+        # ============================================================
+        x0 <- match(tp, type_levels)
+        ng <- length(groups_now)
+    
+        if(ng == 1){
+    
+            group_x <- setNames(x0, groups_now)
+    
+        }else{
+    
+            dodge_width <- 0.8
+    
+            offsets <- seq(
+                -dodge_width / 2 + dodge_width / (2 * ng),
+                 dodge_width / 2 - dodge_width / (2 * ng),
+                length.out = ng
+            )
+    
+            group_x <- setNames(
+                x0 + offsets,
+                groups_now
+            )
+        }
+    
+        stat_now <- stat_now %>%
+            dplyr::mutate(
+                Type = factor(tp, levels = type_levels),
+                xmin = unname(group_x[group1]),
+                xmax = unname(group_x[group2]),
+                groups = paste0(group1, "_vs_", group2),
+                .before = 1
+            )
+    
+        as.data.frame(stat_now)
+    }
+    ###############################################################################################################################
+    ##################################################################  main ######################################################
+    ###############################################################################################################################
+    
     # rename
     if(is.na(type_col)){
         # no Type
