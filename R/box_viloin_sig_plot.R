@@ -81,7 +81,7 @@ box_viloin_sig_plot <- function(data_long, type_col = "Gene",group_col = "Group"
                                 add_point = FALSE,point_size = 1.8,point_alpha = 0.7,point_width = 0.15,
                                 group_color = basicR::get_colors(package = "ggsci",name = "jco",number = 5.1),
                                 plot_type = "box",diff_show_type = "signif",diff_show_name = "p.value",
-                                sig_bracket_vjust = 0.7,within_type_step = 0.1,step_increase = 0,hide_ns = TRUE,bracket_size = 0.8,bracket_y = 0,
+                                sig_bracket_vjust = 0.7,within_type_step = 0.4,step_increase = 0,hide_ns = TRUE,bracket_size = 0.8,bracket_y = 0,
                                 axis_y_title = "Expression", axis_x_title = "Gene",legend_title = "Group",
                                 title_name = NULL
                                ){
@@ -169,7 +169,8 @@ box_viloin_sig_plot <- function(data_long, type_col = "Gene",group_col = "Group"
         # 扩大同一 Type 内不同比较之间的垂直间距
         # 第一个不动，后面依次增加 y_step
         # ------------------------------------------------------------
-        stat_now$y.position <- stat_now$y.position + (seq_len(nrow(stat_now)) - 1) * y_step
+        y0 <- stat_now$y.position[1]
+        stat_now$y.position <- y0 + (seq_len(nrow(stat_now)) - 1) * within_type_step
     
         # ============================================================
         # 手动计算 xmin / xmax
@@ -558,7 +559,7 @@ box_viloin_sig_plot <- function(data_long, type_col = "Gene",group_col = "Group"
                         step.increase = step_increase,
                         hide.ns = FALSE,
                         tip.length = 0,
-                        vjust = sig_bracket_vjust*3.2,
+                        vjust = sig_bracket_vjust + 0.5,
                         bracket.size = bracket_size,
                         bracket.nudge.y = bracket_y,
                         size = 6.5
