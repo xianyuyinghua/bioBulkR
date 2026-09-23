@@ -28,8 +28,6 @@
 #' @param diff_show_name Significance source containing `"value"` for raw
 #'   p-values or `"adj"` for Bonferroni-adjusted p-values.
 #' @param sig_bracket_vjust Vertical justification of annotation text.
-#' @param step_increase Incremental vertical spacing between comparison
-#'   brackets.
 #' @param hide_ns Logical; hide non-significant comparisons.
 #' @param bracket_size Bracket line width.
 #' @param bracket_y Vertical bracket nudge.
@@ -81,7 +79,7 @@ box_viloin_sig_plot <- function(data_long, type_col = "Gene",group_col = "Group"
                                 add_point = FALSE,point_size = 1.8,point_alpha = 0.7,point_width = 0.15,
                                 group_color = basicR::get_colors(package = "ggsci",name = "jco",number = 5.1),
                                 plot_type = "box",diff_show_type = "signif",diff_show_name = "p.value",
-                                sig_bracket_vjust = 0.7,within_type_step = 0.4,step_increase = 0,hide_ns = TRUE,bracket_size = 0.8,bracket_y = 0,
+                                sig_bracket_vjust = 0.7,within_type_step = 0.4,hide_ns = TRUE,bracket_size = 0.8,bracket_y = 0,
                                 axis_y_title = "Expression", axis_x_title = "Gene",legend_title = "Group",
                                 title_name = NULL
                                ){
@@ -556,7 +554,7 @@ box_viloin_sig_plot <- function(data_long, type_col = "Gene",group_col = "Group"
                     ggpubr::stat_pvalue_manual(
                         stat_sig,
                         label = label_show,
-                        step.increase = step_increase,
+                        step.increase = 0,
                         hide.ns = FALSE,
                         tip.length = 0,
                         vjust = sig_bracket_vjust + 0.5,
@@ -572,7 +570,7 @@ box_viloin_sig_plot <- function(data_long, type_col = "Gene",group_col = "Group"
                     ggpubr::stat_pvalue_manual(
                         stat_ns,
                         label = label_show,
-                        step.increase = step_increase,
+                        step.increase = 0,
                         hide.ns = FALSE,
                         tip.length = 0,
                         vjust = sig_bracket_vjust,
