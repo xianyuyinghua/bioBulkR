@@ -102,7 +102,7 @@ High_Throughtput_Count_DEG <- function(expr = data$expr,
     reset <- "\033[0m"
 
     # 设置分组顺序
-    group_order <-  group_order_set(vector = group_order,group_levels = NULL) %>% rev()
+    group_order <-  group_order_set(vector = group_order,group_levels = group_order) %>% rev()
     
     # 高通量数据差异分析
     if(!dir.exists(DEG_output_dir)){dir.create(DEG_output_dir,recursive = T)}
