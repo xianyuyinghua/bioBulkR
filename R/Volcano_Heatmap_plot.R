@@ -109,7 +109,7 @@ Volcano_Heatmap_plot <- function(Res = Res,
     reset <- "\033[0m"
     
     # 设置分组顺序
-    group_order <-  group_order_set(vector = group_order,group_levels = NULL) %>% rev()
+    group_order <-  group_order_set(vector = group_order,group_levels = group_order) %>% rev()
     
     # 差异判断 
     if(p_value == "p.adj"){
