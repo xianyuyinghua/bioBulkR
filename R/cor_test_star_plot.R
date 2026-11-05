@@ -300,7 +300,7 @@ cor_test_star_plot <- function(cor_df,
                 column_names_gp = gpar(fontsize = 12,fontface = "bold"),
                 row_names_max_width = unit(10, "cm")
             )
-           p_heatmap <- draw(p_heatmap,padding = unit(c(5, 10, 5, 10), "mm"))
+           #p_heatmap <- draw(p_heatmap,padding = unit(c(5, 10, 5, 10), "mm"))
         
            p_scatter_marginal <- NULL
        }
