@@ -175,8 +175,8 @@ pROC_plot <- function(data,group_col,genes,data_type = "Train",legend_position =
                  ) +
       geom_step(size = 1) +
       geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "grey", size = 1) +
-      scale_color_manual(values = basicR::get_colors(number = 50.1)) +
-      scale_fill_manual(values = basicR::get_colors(number = 50.1), guide = "none") +
+      scale_color_manual(values = basicR::get_colors(number = 100.1)) +
+      scale_fill_manual(values = basicR::get_colors(number = 100.1), guide = "none") +
       theme_classic(base_size = 16) +
       labs(title = title_text,  x = "1 - Specificity", y = "Sensitivity", color = "", fill = "") +
       theme(

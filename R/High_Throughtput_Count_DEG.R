@@ -161,7 +161,7 @@ High_Throughtput_Count_DEG <- function(expr = data$expr,
             })
     })
     resOrdered <- resdata[order(resdata$padj), ]
-    RES <- as.data.frame(resOrdered) %>% na.omit(DEG) 
+    RES <- as.data.frame(resOrdered) %>% na.omit() 
     RES <- RES %>% dplyr::rename('logFC' = 'log2FoldChange', 'p.adj' = 'padj', 'p.value' = 'pvalue')
     RES$sig = as.factor(ifelse(RES[[pvalue]] < p & abs(RES$logFC) > logFC,
                              ifelse(RES$logFC > logFC,
