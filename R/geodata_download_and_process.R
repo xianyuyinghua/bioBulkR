@@ -130,7 +130,34 @@ geodata_download_and_process <- function(
     if (!dir.exists(exp_dir_name)){dir.create(exp_dir_name,recursive = T)}
 
     # 获取表达矩阵
-    gset <- download_gset(data_id = Data_ID, destdir = exp_dir_name)
+    #gset <- download_gset(data_id = Data_ID, destdir = exp_dir_name)
+    # 获取表达矩阵
+    local_file <- file.path(
+      exp_dir_name,
+      paste0(Data_ID, "_series_matrix.txt.gz")
+    )
+    
+    if (file.exists(local_file)) {
+    
+      message("Using local GEO Series Matrix: ", local_file)
+    
+      gset <- list(
+        GEOquery::getGEO(
+          filename = local_file,
+          AnnotGPL = FALSE,
+          getGPL = FALSE
+        )
+      )
+    
+    } else {
+    
+      gset <- download_gset(
+        data_id = Data_ID,
+        destdir = exp_dir_name
+      )
+    
+    }
+    
     eset <- exprs(gset[[num]]) %>% na.omit()  # 表达矩阵
     metadata <- pData(gset[[num]]) # 元信息
     data_type <- gset[[num]]@experimentData@other$type
