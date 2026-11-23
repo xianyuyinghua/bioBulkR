@@ -608,7 +608,13 @@ enrich_go_kegg <- function(genes,
     ###################################################################################################
     # GO、KEGG富集分析
     if(p_name == "p.value"){p_name = "pvalue"}else if(p_name == "p.adj"){p_name = "p.adjust"}
-    if(species == "9606"){ species_OrgDb <- "org.Hs.eg.db";organism = "hsa"  }else if(species == "10090"){ species_OrgDb <- "org.Mm.eg.db";organism = "mmu" }
+    if(species == "9606"){
+        species_OrgDb <- "org.Hs.eg.db";organism = "hsa"
+    }else if(species == "10090"){ 
+        species_OrgDb <- "org.Mm.eg.db";organism = "mmu" 
+    }else if (species == "9913") {
+        species_OrgDb <- "org.Bt.eg.db";organism <- "bta"
+    }
     gene_ids <- clusterProfiler::bitr(genes, fromType = "SYMBOL", toType ="ENTREZID", OrgDb = species_OrgDb)
   
     #--KEGG--------------------------------------------------------------------------------
